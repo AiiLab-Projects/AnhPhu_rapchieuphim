@@ -23,16 +23,19 @@ let activeMediaMode = 'canvas'; // 'canvas' | 'video' | 'youtube'
 
 // Camera transition animation state
 let cameraAnim = null;
+// Camera modes: '3rd_person' | '1st_person' | 'overview'
+let cameraMode = '3rd_person';
 
 // ==========================================
 // 2. SCENE, CAMERA & RENDERERS
 // ==========================================
 const webglContainer = document.getElementById('webgl-container');
 const css3dContainer = document.getElementById('css3d-container');
+const nametagsContainer = document.getElementById('nametags-container');
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x050508);
-scene.fog = new THREE.FogExp2(0x050508, 0.008);
+scene.fog = new THREE.FogExp2(0x050508, 0.007);
 
 const cssScene = new THREE.Scene();
 
@@ -40,9 +43,9 @@ const camera = new THREE.PerspectiveCamera(
     55,
     window.innerWidth / window.innerHeight,
     0.1,
-    150
+    160
 );
-camera.position.set(0, 15.5, 27);
+camera.position.set(0, 7.5, 12);
 
 // WebGL Renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -62,17 +65,17 @@ css3dContainer.appendChild(cssRenderer.domElement);
 // OrbitControls
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.dampingFactor = 0.06;
-controls.maxPolarAngle = Math.PI / 2 + 0.15;
+controls.dampingFactor = 0.08;
+controls.maxPolarAngle = Math.PI / 2 + 0.12;
 controls.minDistance = 0.3;
-controls.maxDistance = 60;
-controls.target.set(0, 6.2, -6);
+controls.maxDistance = 55;
+controls.target.set(0, 5, 5);
 controls.update();
 
 // ==========================================
 // 3. LIGHTING SYSTEM (AUDITORIUM + AMBILIGHT)
 // ==========================================
-const ambientLight = new THREE.AmbientLight(0x222638, 0.8);
+const ambientLight = new THREE.AmbientLight(0x282d44, 0.85);
 scene.add(ambientLight);
 
 // Ceiling Downlights
@@ -97,7 +100,7 @@ ceilingLightPositions.forEach(([x, y, z]) => {
     scene.add(bulbMesh);
 });
 
-// Screen Ambilight (casts screen glow onto the 500 seats)
+// Screen Ambilight
 const screenGlowCenter = new THREE.PointLight(0x4f8cff, 85, 48, 1.3);
 screenGlowCenter.position.set(0, SCREEN_POS.y, SCREEN_POS.z + 2.5);
 scene.add(screenGlowCenter);
@@ -208,18 +211,18 @@ function renderDemoCanvas(time) {
     demoCtx.shadowColor = `hsl(${hue1}, 95%, 60%)`;
     demoCtx.shadowBlur = 28;
     demoCtx.fillStyle = '#ffffff';
-    demoCtx.font = '800 54px "Segoe UI", sans-serif';
-    demoCtx.fillText('RẠP CHIẾU PHIM IMAX 3D', 0, -25);
+    demoCtx.font = '800 50px "Segoe UI", sans-serif';
+    demoCtx.fillText('RẠP PHIM 3D MULTIPLAYER', 0, -25);
 
     demoCtx.shadowBlur = 14;
     demoCtx.fillStyle = '#93c5fd';
-    demoCtx.font = '600 24px "Segoe UI", sans-serif';
-    demoCtx.fillText('KHÔNG Gian 500 CHỖ NGỒI • TRẢI NGHIỆM GÓC NHÌN THỰC TẾ', 0, 25);
+    demoCtx.font = '600 22px "Segoe UI", sans-serif';
+    demoCtx.fillText('ĐIỀU KHIỂN NHÂN VẬT • CHỌN CHỖ NGỒI • XEM PHIM CÙNG BẠN BÈ', 0, 25);
 
     demoCtx.shadowBlur = 0;
     demoCtx.fillStyle = 'rgba(255,255,255,0.75)';
-    demoCtx.font = '500 18px "Segoe UI", sans-serif';
-    demoCtx.fillText('Chọn phim mẫu, tải video từ máy hoặc dán link YouTube ở thanh bên dưới để phát', 0, 72);
+    demoCtx.font = '500 17px "Segoe UI", sans-serif';
+    demoCtx.fillText('Dùng phím W, A, S, D di chuyển nhân vật • Nhấn phím E hoặc click ghế để ngồi xem', 0, 72);
 
     const barCount = 48;
     const barWidth = 14;
@@ -281,6 +284,7 @@ function buildAuditorium() {
     baseFloor.position.set(0, -0.25, 4);
     hallGroup.add(baseFloor);
 
+    // Stage
     const stage = new THREE.Mesh(new THREE.BoxGeometry(36, 1.1, 7), stageMat);
     stage.position.set(0, 0.55, -16);
     hallGroup.add(stage);
@@ -289,22 +293,21 @@ function buildAuditorium() {
     stageLed.position.set(0, 1.11, -12.5);
     hallGroup.add(stageLed);
 
+    // Screen frame
     const frameGeo = new THREE.BoxGeometry(SCREEN_WIDTH + 1.2, SCREEN_HEIGHT + 1.2, 0.6);
-    const frameMat = new THREE.MeshStandardMaterial({
-        color: 0x050507,
-        roughness: 0.4,
-        metalness: 0.5
-    });
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x050507, roughness: 0.4, metalness: 0.5 });
     const screenFrame = new THREE.Mesh(frameGeo, frameMat);
     screenFrame.position.copy(SCREEN_POS);
     screenFrame.position.z -= 0.32;
     hallGroup.add(screenFrame);
 
+    // Screen mesh
     const screenGeo = new THREE.PlaneGeometry(SCREEN_WIDTH, SCREEN_HEIGHT);
     screenMesh = new THREE.Mesh(screenGeo, screenMaterial);
     screenMesh.position.copy(SCREEN_POS);
     hallGroup.add(screenMesh);
 
+    // CSS3D YouTube Screen
     const ytWrapper = document.createElement('div');
     ytWrapper.style.width = '1200px';
     ytWrapper.style.height = '510px';
@@ -324,6 +327,7 @@ function buildAuditorium() {
     youtubeCssObject.visible = false;
     cssScene.add(youtubeCssObject);
 
+    // Speakers
     const speakerGeo = new THREE.BoxGeometry(1.6, 5.5, 1.2);
     const speakerMat = new THREE.MeshStandardMaterial({ color: 0x101218, roughness: 0.5, metalness: 0.4 });
     [-14.5, 14.5].forEach(xPos => {
@@ -332,6 +336,7 @@ function buildAuditorium() {
         hallGroup.add(spk);
     });
 
+    // Walls
     const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.8, 19, 52), wallMat);
     leftWall.position.set(-21.5, 9, 4);
     hallGroup.add(leftWall);
@@ -352,6 +357,7 @@ function buildAuditorium() {
     ceiling.position.set(0, 18.2, 4);
     hallGroup.add(ceiling);
 
+    // Projection window
     const boothGlass = new THREE.Mesh(
         new THREE.PlaneGeometry(4.5, 1.4),
         new THREE.MeshBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.45 })
@@ -360,6 +366,7 @@ function buildAuditorium() {
     boothGlass.rotation.y = Math.PI;
     hallGroup.add(boothGlass);
 
+    // Acoustic Ribs & Wall Lights
     const panelGeo = new THREE.BoxGeometry(0.35, 11, 2.4);
     const panelMat = new THREE.MeshStandardMaterial({ color: 0x241219, roughness: 0.85 });
     const sconceGeo = new THREE.BoxGeometry(0.15, 2.5, 0.12);
@@ -377,6 +384,7 @@ function buildAuditorium() {
         });
     }
 
+    // Risers (20 rows)
     for (let r = 0; r < ROWS.length; r++) {
         const rowY = getRowElevation(r);
         const rowZ = getRowZ(r);
@@ -393,8 +401,7 @@ function buildAuditorium() {
         carpetMesh.position.set(0, rowY + 0.02, rowZ);
         hallGroup.add(carpetMesh);
 
-        const aisleXs = [-7.7, 7.7];
-        aisleXs.forEach(ax => {
+        [-7.7, 7.7].forEach(ax => {
             const stepLight = new THREE.Mesh(
                 new THREE.BoxGeometry(1.5, 0.05, 0.06),
                 ledStripMat
@@ -453,6 +460,19 @@ function getSeatCategory(rowIndex) {
             emissive: 0x33081b
         };
     }
+}
+
+// Determine walking floor elevation anywhere in the hall
+function getFloorElevationAt(x, z) {
+    if (z < -12.5) {
+        return 1.1; // Stage
+    }
+    if (z < -7.325) {
+        return 0.2; // Front walkway
+    }
+    const r = Math.floor((z - (-7.325)) / 1.65);
+    const clampedR = Math.max(0, Math.min(ROWS.length - 1, r));
+    return getRowElevation(clampedR);
 }
 
 const cushionGeo = new THREE.BoxGeometry(0.92, 0.22, 0.82);
@@ -527,7 +547,10 @@ function build500Seats() {
 
             allSeatsGroup.add(seatGroup);
 
+            // Eye position when sitting
             const eyePosition = new THREE.Vector3(x, y + 1.38, z + 0.15);
+            // Sit position of avatar base
+            const sitPosition = new THREE.Vector3(x, y + 0.42, z + 0.12);
 
             seatsData.set(seatId, {
                 id: seatId,
@@ -537,7 +560,9 @@ function build500Seats() {
                 category: cat,
                 material: fabricMat,
                 group: seatGroup,
-                eyePosition
+                eyePosition,
+                sitPosition,
+                yaw
             });
         }
     });
@@ -546,8 +571,513 @@ function build500Seats() {
 }
 
 // ==========================================
-// 7. SEAT SELECTION & SMOOTH CAMERA FLIGHT
+// 7. AVATAR / CHARACTER BUILDER SYSTEM
 // ==========================================
+function createAvatar(colorHex = '#ef4444', isLocal = false) {
+    const avatarGroup = new THREE.Group();
+
+    // Torso (Hoodie / Shirt)
+    const shirtMat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(colorHex),
+        roughness: 0.6,
+        metalness: 0.15
+    });
+    const skinMat = new THREE.MeshStandardMaterial({
+        color: 0xffdfc4,
+        roughness: 0.8
+    });
+    const pantsMat = new THREE.MeshStandardMaterial({
+        color: 0x1e293b,
+        roughness: 0.7
+    });
+    const shoeMat = new THREE.MeshStandardMaterial({
+        color: 0xf8fafc,
+        roughness: 0.5
+    });
+
+    // Torso group
+    const torsoGroup = new THREE.Group();
+    torsoGroup.position.y = 0.92;
+
+    const torsoMesh = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.62, 0.3), shirtMat);
+    torsoMesh.castShadow = true;
+    torsoGroup.add(torsoMesh);
+
+    // Head
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0, 0.54, 0);
+
+    const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), skinMat);
+    headMesh.castShadow = true;
+    headGroup.add(headMesh);
+
+    // Hair / Cap
+    const capMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.24, 0.24, 0.1, 16),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.7 })
+    );
+    capMesh.position.set(0, 0.16, -0.02);
+    headGroup.add(capMesh);
+
+    // 3D Cinema Glasses (Red / Cyan Lenses!)
+    const glassesFrame = new THREE.Mesh(
+        new THREE.BoxGeometry(0.36, 0.08, 0.04),
+        new THREE.MeshBasicMaterial({ color: 0x111111 })
+    );
+    glassesFrame.position.set(0, 0.03, 0.21);
+    headGroup.add(glassesFrame);
+
+    const lensLeft = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 0.07, 0.02),
+        new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.85 })
+    );
+    lensLeft.position.set(-0.09, 0.03, 0.23);
+    headGroup.add(lensLeft);
+
+    const lensRight = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 0.07, 0.02),
+        new THREE.MeshBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.85 })
+    );
+    lensRight.position.set(0.09, 0.03, 0.23);
+    headGroup.add(lensRight);
+
+    torsoGroup.add(headGroup);
+
+    // Left Arm
+    const leftArmGroup = new THREE.Group();
+    leftArmGroup.position.set(-0.35, 0.24, 0);
+    const leftArmMesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.5, 0.16), shirtMat);
+    leftArmMesh.position.set(0, -0.22, 0);
+    leftArmGroup.add(leftArmMesh);
+    const leftHand = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), skinMat);
+    leftHand.position.set(0, -0.48, 0);
+    leftArmGroup.add(leftHand);
+    torsoGroup.add(leftArmGroup);
+
+    // Right Arm
+    const rightArmGroup = new THREE.Group();
+    rightArmGroup.position.set(0.35, 0.24, 0);
+    const rightArmMesh = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.5, 0.16), shirtMat);
+    rightArmMesh.position.set(0, -0.22, 0);
+    rightArmGroup.add(rightArmMesh);
+    const rightHand = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), skinMat);
+    rightHand.position.set(0, -0.48, 0);
+    rightArmGroup.add(rightHand);
+    torsoGroup.add(rightArmGroup);
+
+    // Left Leg
+    const leftLegGroup = new THREE.Group();
+    leftLegGroup.position.set(-0.15, -0.3, 0);
+    const leftLegMesh = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.58, 0.18), pantsMat);
+    leftLegMesh.position.set(0, -0.28, 0);
+    leftLegGroup.add(leftLegMesh);
+    const leftShoe = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.11, 0.26), shoeMat);
+    leftShoe.position.set(0, -0.56, 0.04);
+    leftLegGroup.add(leftShoe);
+    torsoGroup.add(leftLegGroup);
+
+    // Right Leg
+    const rightLegGroup = new THREE.Group();
+    rightLegGroup.position.set(0.15, -0.3, 0);
+    const rightLegMesh = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.58, 0.18), pantsMat);
+    rightLegMesh.position.set(0, -0.28, 0);
+    rightLegGroup.add(rightLegMesh);
+    const rightShoe = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.11, 0.26), shoeMat);
+    rightShoe.position.set(0, -0.56, 0.04);
+    rightLegGroup.add(rightShoe);
+    torsoGroup.add(rightLegGroup);
+
+    avatarGroup.add(torsoGroup);
+
+    scene.add(avatarGroup);
+
+    return {
+        group: avatarGroup,
+        torsoGroup,
+        headGroup,
+        leftArmGroup,
+        rightArmGroup,
+        leftLegGroup,
+        rightLegGroup,
+        shirtMat,
+        walkCycle: 0,
+        isSitting: false,
+        updateColor(hex) {
+            shirtMat.color.set(hex);
+        },
+        setSittingPose(sitting) {
+            this.isSitting = sitting;
+            if (sitting) {
+                leftLegGroup.rotation.x = Math.PI / 2;
+                rightLegGroup.rotation.x = Math.PI / 2;
+                leftArmGroup.rotation.x = 0.45;
+                rightArmGroup.rotation.x = 0.45;
+                torsoGroup.position.y = 0.62;
+            } else {
+                leftLegGroup.rotation.x = 0;
+                rightLegGroup.rotation.x = 0;
+                leftArmGroup.rotation.x = 0;
+                rightArmGroup.rotation.x = 0;
+                torsoGroup.position.y = 0.92;
+            }
+        },
+        animateWalk(isWalking, delta) {
+            if (this.isSitting) return;
+            if (isWalking) {
+                this.walkCycle += delta * 9.5;
+                const swing = Math.sin(this.walkCycle);
+                leftLegGroup.rotation.x = swing * 0.55;
+                rightLegGroup.rotation.x = -swing * 0.55;
+                leftArmGroup.rotation.x = -swing * 0.45;
+                rightArmGroup.rotation.x = swing * 0.45;
+                torsoGroup.position.y = 0.92 + Math.abs(Math.sin(this.walkCycle * 2)) * 0.04;
+            } else {
+                leftLegGroup.rotation.x *= 0.85;
+                rightLegGroup.rotation.x *= 0.85;
+                leftArmGroup.rotation.x *= 0.85;
+                rightArmGroup.rotation.x *= 0.85;
+                torsoGroup.position.y = 0.92;
+            }
+        }
+    };
+}
+
+// ==========================================
+// 8. MULTIPLAYER PLAYERS MANAGER
+// ==========================================
+let localPlayerId = null;
+let localPlayerData = {
+    name: 'Khán giả #1',
+    color: '#ef4444',
+    x: 0,
+    y: 4.8,
+    z: 8.0,
+    yaw: 0,
+    state: 'standing',
+    seatId: null
+};
+
+let localAvatar = null;
+const remotePlayers = new Map(); // id -> { data, avatar, targetPos, targetYaw, nametagEl }
+let ws = null;
+
+function createNametagElement(id, name, color) {
+    const el = document.createElement('div');
+    el.className = 'player-nametag';
+    el.id = `nametag-${id}`;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'nametag-bubble hidden';
+    bubble.id = `bubble-${id}`;
+    el.appendChild(bubble);
+
+    const label = document.createElement('div');
+    label.className = 'nametag-label';
+    label.innerHTML = `
+        <span class="nametag-dot" id="dot-${id}" style="background: ${color};"></span>
+        <span id="name-${id}">${name}</span>
+    `;
+    el.appendChild(label);
+
+    nametagsContainer.appendChild(el);
+    return el;
+}
+
+function showSpeechBubble(id, text) {
+    const bubble = document.getElementById(`bubble-${id}`);
+    if (!bubble) return;
+    bubble.textContent = text;
+    bubble.classList.remove('hidden');
+
+    if (bubble._timer) clearTimeout(bubble._timer);
+    bubble._timer = setTimeout(() => {
+        bubble.classList.add('hidden');
+    }, 4500);
+}
+
+// ==========================================
+// 9. WEBSOCKET NETWORK SYNCHRONIZATION
+// ==========================================
+function initWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}`;
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+        document.getElementById('chat-status').textContent = '🟢 Đã kết nối';
+        document.getElementById('chat-status').style.color = '#10b981';
+    };
+
+    ws.onclose = () => {
+        document.getElementById('chat-status').textContent = '🔴 Mất kết nối (Thử lại...)';
+        document.getElementById('chat-status').style.color = '#ef4444';
+        setTimeout(initWebSocket, 2500);
+    };
+
+    ws.onmessage = event => {
+        try {
+            const msg = JSON.parse(event.data);
+            handleNetworkMessage(msg);
+        } catch (err) {
+            console.error('WS parse error:', err);
+        }
+    };
+}
+
+function handleNetworkMessage(msg) {
+    switch (msg.type) {
+        case 'welcome': {
+            localPlayerId = msg.playerId;
+            localPlayerData = msg.playerData;
+
+            // Spawn local avatar
+            localAvatar = createAvatar(localPlayerData.color, true);
+            localAvatar.group.position.set(localPlayerData.x, localPlayerData.y, localPlayerData.z);
+            localAvatar.group.rotation.y = localPlayerData.yaw;
+
+            createNametagElement(localPlayerId, `${localPlayerData.name} (Bạn)`, localPlayerData.color);
+
+            // Populate existing players
+            msg.allPlayers.forEach(p => {
+                if (p.id !== localPlayerId) {
+                    addRemotePlayer(p);
+                }
+            });
+
+            updateOnlineCount();
+
+            // Sync video if remote already playing
+            if (msg.videoState && msg.videoState.src) {
+                applySyncedVideo(msg.videoState);
+            }
+            break;
+        }
+
+        case 'player_joined': {
+            if (msg.player.id !== localPlayerId) {
+                addRemotePlayer(msg.player);
+                addChatMessage('system', `${msg.player.name} vừa bước vào rạp.`);
+                updateOnlineCount();
+            }
+            break;
+        }
+
+        case 'player_left': {
+            removeRemotePlayer(msg.playerId);
+            updateOnlineCount();
+            break;
+        }
+
+        case 'player_moved': {
+            const remote = remotePlayers.get(msg.playerId);
+            if (remote) {
+                remote.targetPos.set(msg.x, msg.y, msg.z);
+                remote.targetYaw = msg.yaw;
+                remote.state = msg.state;
+                if (msg.seatId !== remote.data.seatId) {
+                    remote.data.seatId = msg.seatId;
+                    remote.avatar.setSittingPose(msg.state === 'sitting');
+                }
+            }
+            break;
+        }
+
+        case 'player_sat': {
+            const remote = remotePlayers.get(msg.playerId);
+            if (remote) {
+                remote.targetPos.set(msg.x, msg.y, msg.z);
+                remote.targetYaw = msg.yaw;
+                remote.state = 'sitting';
+                remote.avatar.setSittingPose(true);
+            }
+            break;
+        }
+
+        case 'player_stood': {
+            const remote = remotePlayers.get(msg.playerId);
+            if (remote) {
+                remote.targetPos.set(msg.x, msg.y, msg.z);
+                remote.state = 'standing';
+                remote.avatar.setSittingPose(false);
+            }
+            break;
+        }
+
+        case 'player_profile_updated': {
+            if (msg.playerId === localPlayerId) {
+                localPlayerData.name = msg.name;
+                localPlayerData.color = msg.color;
+                localAvatar.updateColor(msg.color);
+                document.getElementById(`name-${localPlayerId}`).textContent = `${msg.name} (Bạn)`;
+                document.getElementById(`dot-${localPlayerId}`).style.background = msg.color;
+            } else {
+                const remote = remotePlayers.get(msg.playerId);
+                if (remote) {
+                    remote.data.name = msg.name;
+                    remote.data.color = msg.color;
+                    remote.avatar.updateColor(msg.color);
+                    document.getElementById(`name-${msg.playerId}`).textContent = msg.name;
+                    document.getElementById(`dot-${msg.playerId}`).style.background = msg.color;
+                }
+            }
+            break;
+        }
+
+        case 'player_chat': {
+            addChatMessage('user', msg.text, msg.name);
+            showSpeechBubble(msg.playerId, msg.text);
+            break;
+        }
+
+        case 'player_emote': {
+            showSpeechBubble(msg.playerId, msg.emote);
+            break;
+        }
+
+        case 'video_synced': {
+            applySyncedVideo(msg.videoState);
+            addChatMessage('system', `${msg.byPlayer} vừa chuyển hoặc phát phim.`);
+            break;
+        }
+    }
+}
+
+function addRemotePlayer(player) {
+    if (remotePlayers.has(player.id)) return;
+
+    const avatar = createAvatar(player.color, false);
+    avatar.group.position.set(player.x, player.y, player.z);
+    avatar.group.rotation.y = player.yaw;
+
+    if (player.state === 'sitting') {
+        avatar.setSittingPose(true);
+    }
+
+    const nametagEl = createNametagElement(player.id, player.name, player.color);
+
+    remotePlayers.set(player.id, {
+        data: player,
+        avatar,
+        targetPos: new THREE.Vector3(player.x, player.y, player.z),
+        targetYaw: player.yaw,
+        state: player.state,
+        nametagEl
+    });
+}
+
+function removeRemotePlayer(playerId) {
+    const remote = remotePlayers.get(playerId);
+    if (!remote) return;
+
+    scene.remove(remote.avatar.group);
+    if (remote.nametagEl && remote.nametagEl.parentNode) {
+        remote.nametagEl.parentNode.removeChild(remote.nametagEl);
+    }
+    remotePlayers.delete(playerId);
+}
+
+function updateOnlineCount() {
+    const count = 1 + remotePlayers.size;
+    document.getElementById('online-count').textContent = count;
+}
+
+function sendNetwork(data) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(data));
+    }
+}
+
+let lastMoveSent = 0;
+function broadcastLocalMovement() {
+    const now = performance.now();
+    if (now - lastMoveSent < 45) return; // ~22 updates/sec
+    lastMoveSent = now;
+
+    sendNetwork({
+        type: 'move',
+        x: Number(localPlayerData.x.toFixed(2)),
+        y: Number(localPlayerData.y.toFixed(2)),
+        z: Number(localPlayerData.z.toFixed(2)),
+        yaw: Number(localPlayerData.yaw.toFixed(2)),
+        state: localPlayerData.state,
+        seatId: localPlayerData.seatId
+    });
+}
+
+// ==========================================
+// 10. LOCAL CHARACTER SITTING & MOVEMENT
+// ==========================================
+const interactionHud = document.getElementById('interaction-hud');
+const interactionText = document.getElementById('interaction-text');
+
+function sitDownLocalPlayer(seatId) {
+    const seat = seatsData.get(seatId);
+    if (!seat || !localAvatar) return;
+
+    currentSeatId = seatId;
+    localPlayerData.seatId = seatId;
+    localPlayerData.state = 'sitting';
+
+    // Position avatar seated squarely on the chair
+    localPlayerData.x = seat.sitPosition.x;
+    localPlayerData.y = seat.sitPosition.y;
+    localPlayerData.z = seat.sitPosition.z;
+    localPlayerData.yaw = seat.yaw;
+
+    localAvatar.group.position.copy(seat.sitPosition);
+    localAvatar.group.rotation.y = seat.yaw;
+    localAvatar.setSittingPose(true);
+
+    sendNetwork({
+        type: 'sit',
+        seatId: seatId,
+        x: localPlayerData.x,
+        y: localPlayerData.y,
+        z: localPlayerData.z,
+        yaw: localPlayerData.yaw
+    });
+
+    updateSeatVisuals();
+    document.getElementById('current-seat-label').textContent = `Đang ngồi ghế ${seatId}`;
+    interactionHud.classList.remove('hidden');
+    interactionText.textContent = `Đứng dậy khỏi ghế ${seatId}`;
+
+    // Adjust camera to a majestic cinema viewing angle
+    const eyePos = seat.eyePosition.clone();
+    const dirToScreen = new THREE.Vector3().subVectors(SCREEN_POS, eyePos).normalize();
+    const lookTarget = eyePos.clone().add(dirToScreen.multiplyScalar(15));
+    controls.target.copy(lookTarget);
+    camera.position.set(eyePos.x, eyePos.y + 0.35, eyePos.z + 0.4);
+}
+
+function standUpLocalPlayer() {
+    if (!localAvatar || !currentSeatId) return;
+
+    const seat = seatsData.get(currentSeatId);
+    currentSeatId = null;
+    localPlayerData.seatId = null;
+    localPlayerData.state = 'standing';
+
+    // Step just in front of the seat
+    if (seat) {
+        localPlayerData.z -= 0.65;
+        localPlayerData.y = getFloorElevationAt(localPlayerData.x, localPlayerData.z);
+        localAvatar.group.position.set(localPlayerData.x, localPlayerData.y, localPlayerData.z);
+    }
+    localAvatar.setSittingPose(false);
+
+    sendNetwork({
+        type: 'stand',
+        x: localPlayerData.x,
+        y: localPlayerData.y,
+        z: localPlayerData.z
+    });
+
+    updateSeatVisuals();
+    document.getElementById('current-seat-label').textContent = 'Đang đi lại';
+    interactionHud.classList.add('hidden');
+}
+
 function updateSeatVisuals() {
     seatsData.forEach((seat, id) => {
         if (id === currentSeatId) {
@@ -567,68 +1097,24 @@ function updateSeatVisuals() {
     });
 }
 
-function animateCameraTo(targetPos, targetLookAt, duration = 1100) {
-    cameraAnim = {
-        startTime: performance.now(),
-        duration,
-        startPos: camera.position.clone(),
-        endPos: targetPos.clone(),
-        startLook: controls.target.clone(),
-        endLook: targetLookAt.clone()
-    };
-}
+function findNearestSeat() {
+    if (!localAvatar) return null;
+    let nearest = null;
+    let minDist = 2.2;
+    const pPos = localAvatar.group.position;
 
-function sitAtSeat(seatId) {
-    const seat = seatsData.get(seatId);
-    if (!seat) return;
-
-    currentSeatId = seatId;
-    updateSeatVisuals();
-
-    document.getElementById('current-seat-label').textContent = `Ghế ${seat.id} (${seat.category.name.split(' ')[1]})`;
-    document.getElementById('select-row').value = seat.row;
-    document.getElementById('select-col').value = String(seat.col);
-
-    document.querySelectorAll('.preset-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.seat === seatId);
+    seatsData.forEach(seat => {
+        const d = pPos.distanceTo(seat.sitPosition);
+        if (d < minDist) {
+            minDist = d;
+            nearest = seat;
+        }
     });
-
-    const eyePos = seat.eyePosition.clone();
-    const dirToScreen = new THREE.Vector3()
-        .subVectors(SCREEN_POS, eyePos)
-        .normalize();
-    const lookTarget = eyePos.clone().add(dirToScreen.multiplyScalar(14));
-
-    animateCameraTo(eyePos, lookTarget, 1100);
-}
-
-function setPresetCamera(presetName) {
-    currentSeatId = null;
-    updateSeatVisuals();
-
-    document.querySelectorAll('.preset-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.preset === presetName);
-    });
-
-    if (presetName === 'overview') {
-        document.getElementById('current-seat-label').textContent = 'Toàn cảnh (Tự do)';
-        animateCameraTo(
-            new THREE.Vector3(0, 15.5, 27),
-            new THREE.Vector3(0, 6.2, -6),
-            1200
-        );
-    } else if (presetName === 'stage') {
-        document.getElementById('current-seat-label').textContent = 'Từ sân khấu nhìn xuống 500 ghế';
-        animateCameraTo(
-            new THREE.Vector3(0, 5.5, -13.5),
-            new THREE.Vector3(0, 5.2, 12),
-            1200
-        );
-    }
+    return nearest;
 }
 
 // ==========================================
-// 8. RAYCASTING (CLICK & HOVER ON 500 SEATS)
+// 11. RAYCASTING (HOVER & CLICK 500 SEATS)
 // ==========================================
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
@@ -688,13 +1174,13 @@ renderer.domElement.addEventListener('pointerup', e => {
     if (hits.length > 0) {
         const seatId = hits[0].object.userData.seatId;
         if (seatId) {
-            sitAtSeat(seatId);
+            sitDownLocalPlayer(seatId);
         }
     }
 });
 
 // ==========================================
-// 9. VIDEO & YOUTUBE MEDIA CONTROLLER
+// 12. VIDEO PLAYBACK & SYNCHRONIZATION
 // ==========================================
 const btnPlayPause = document.getElementById('btn-play-pause');
 const seekBar = document.getElementById('seek-bar');
@@ -718,7 +1204,7 @@ function extractYouTubeId(url) {
     return match && match[1].length === 11 ? match[1] : null;
 }
 
-function switchToCanvasDemo() {
+function switchToCanvasDemo(sync = true) {
     activeMediaMode = 'canvas';
     videoElement.pause();
     youtubeIframe.src = 'about:blank';
@@ -730,9 +1216,18 @@ function switchToCanvasDemo() {
     playbackControls.classList.remove('hidden');
     youtubeNotice.classList.add('hidden');
     btnPlayPause.textContent = 'Đang chạy Demo';
+
+    if (sync) {
+        sendNetwork({
+            type: 'sync_video',
+            mode: 'canvas',
+            src: '',
+            title: 'Intro IMAX 3D'
+        });
+    }
 }
 
-function loadDirectVideo(srcUrl) {
+function loadDirectVideo(srcUrl, sync = true, startTime = 0) {
     activeMediaMode = 'video';
     youtubeIframe.src = 'about:blank';
     youtubeCssObject.visible = false;
@@ -741,6 +1236,9 @@ function loadDirectVideo(srcUrl) {
 
     videoElement.src = srcUrl;
     videoElement.load();
+    if (startTime > 0) {
+        videoElement.currentTime = startTime;
+    }
     videoElement.play().then(() => {
         btnPlayPause.textContent = 'Tạm dừng';
     }).catch(() => {
@@ -751,9 +1249,19 @@ function loadDirectVideo(srcUrl) {
     screenMaterial.needsUpdate = true;
     playbackControls.classList.remove('hidden');
     youtubeNotice.classList.add('hidden');
+
+    if (sync) {
+        sendNetwork({
+            type: 'sync_video',
+            mode: 'video',
+            src: srcUrl,
+            currentTime: startTime,
+            isPlaying: true
+        });
+    }
 }
 
-function loadYouTubeVideo(videoId) {
+function loadYouTubeVideo(videoId, sync = true) {
     activeMediaMode = 'youtube';
     videoElement.pause();
 
@@ -762,13 +1270,36 @@ function loadYouTubeVideo(videoId) {
     css3dContainer.classList.add('youtube-active');
     playbackControls.classList.add('hidden');
     youtubeNotice.classList.remove('hidden');
+
+    if (sync) {
+        sendNetwork({
+            type: 'sync_video',
+            mode: 'youtube',
+            src: videoId,
+            isPlaying: true
+        });
+    }
+}
+
+function applySyncedVideo(state) {
+    if (state.mode === 'canvas') {
+        switchToCanvasDemo(false);
+    } else if (state.mode === 'youtube') {
+        loadYouTubeVideo(state.src, false);
+    } else if (state.mode === 'video') {
+        loadDirectVideo(state.src, false, state.currentTime || 0);
+        if (!state.isPlaying) {
+            videoElement.pause();
+            btnPlayPause.textContent = 'Phát phim';
+        }
+    }
 }
 
 document.getElementById('file-upload').addEventListener('change', e => {
     const file = e.target.files[0];
     if (!file) return;
     const fileUrl = URL.createObjectURL(file);
-    loadDirectVideo(fileUrl);
+    loadDirectVideo(fileUrl, true);
     if (lightMode === 2) applyLightMode(1);
 });
 
@@ -778,9 +1309,9 @@ function handleUrlSubmit() {
 
     const ytId = extractYouTubeId(rawUrl);
     if (ytId) {
-        loadYouTubeVideo(ytId);
+        loadYouTubeVideo(ytId, true);
     } else {
-        loadDirectVideo(rawUrl);
+        loadDirectVideo(rawUrl, true);
     }
 }
 
@@ -792,9 +1323,9 @@ document.getElementById('video-url-input').addEventListener('keydown', e => {
 document.getElementById('sample-video-select').addEventListener('change', e => {
     const val = e.target.value;
     if (val === 'trailer_canvas') {
-        switchToCanvasDemo();
+        switchToCanvasDemo(true);
     } else {
-        loadDirectVideo(val);
+        loadDirectVideo(val, true);
     }
 });
 
@@ -802,15 +1333,29 @@ btnPlayPause.addEventListener('click', () => {
     if (activeMediaMode === 'canvas') {
         const sampleSelect = document.getElementById('sample-video-select');
         sampleSelect.selectedIndex = 1;
-        loadDirectVideo(sampleSelect.value);
+        loadDirectVideo(sampleSelect.value, true);
         return;
     }
     if (videoElement.paused) {
         videoElement.play();
         btnPlayPause.textContent = 'Tạm dừng';
+        sendNetwork({
+            type: 'sync_video',
+            mode: 'video',
+            src: videoElement.src,
+            currentTime: videoElement.currentTime,
+            isPlaying: true
+        });
     } else {
         videoElement.pause();
         btnPlayPause.textContent = 'Phát phim';
+        sendNetwork({
+            type: 'sync_video',
+            mode: 'video',
+            src: videoElement.src,
+            currentTime: videoElement.currentTime,
+            isPlaying: false
+        });
     }
 });
 
@@ -825,6 +1370,13 @@ videoElement.addEventListener('timeupdate', () => {
 seekBar.addEventListener('input', () => {
     if (activeMediaMode === 'video' && videoElement.duration) {
         videoElement.currentTime = (seekBar.value / 100) * videoElement.duration;
+        sendNetwork({
+            type: 'sync_video',
+            mode: 'video',
+            src: videoElement.src,
+            currentTime: videoElement.currentTime,
+            isPlaying: !videoElement.paused
+        });
     }
 });
 
@@ -840,7 +1392,102 @@ volumeBar.addEventListener('input', () => {
 });
 
 // ==========================================
-// 10. UI CONTROLS, 500-SEAT MAP & KEYBOARD
+// 13. CHAT, EMOTES & AVATAR PROFILE MODAL
+// ==========================================
+const chatMessages = document.getElementById('chat-messages');
+const chatForm = document.getElementById('chat-form');
+const chatInput = document.getElementById('chat-input');
+
+function addChatMessage(type, text, sender = '') {
+    const msgEl = document.createElement('div');
+    msgEl.className = `chat-msg ${type}`;
+    if (sender) {
+        msgEl.innerHTML = `<span class="sender">${sender}:</span><span>${text}</span>`;
+    } else {
+        msgEl.textContent = text;
+    }
+    chatMessages.appendChild(msgEl);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+chatForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const text = chatInput.value.trim();
+    if (!text) return;
+
+    sendNetwork({
+        type: 'chat',
+        text: text
+    });
+
+    chatInput.value = '';
+    chatInput.blur();
+});
+
+document.querySelectorAll('.emote-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const emote = btn.dataset.emote;
+        sendNetwork({
+            type: 'emote',
+            emote: emote
+        });
+    });
+});
+
+// Profile Modal & Color Picker
+const profileModal = document.getElementById('profile-modal');
+const profileNameInput = document.getElementById('profile-name-input');
+const colorOptionsContainer = document.getElementById('color-options-container');
+
+const AVATAR_COLORS = [
+    '#ef4444', '#f97316', '#f59e0b', '#10b981',
+    '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'
+];
+let selectedColor = '#ef4444';
+
+AVATAR_COLORS.forEach(c => {
+    const opt = document.createElement('div');
+    opt.className = 'color-option';
+    opt.style.background = c;
+    opt.dataset.color = c;
+    if (c === selectedColor) opt.classList.add('selected');
+    opt.addEventListener('click', () => {
+        document.querySelectorAll('.color-option').forEach(el => el.classList.remove('selected'));
+        opt.classList.add('selected');
+        selectedColor = c;
+    });
+    colorOptionsContainer.appendChild(opt);
+});
+
+document.getElementById('btn-profile').addEventListener('click', () => {
+    profileNameInput.value = localPlayerData.name;
+    selectedColor = localPlayerData.color;
+    document.querySelectorAll('.color-option').forEach(el => {
+        el.classList.toggle('selected', el.dataset.color === selectedColor);
+    });
+    profileModal.classList.remove('hidden');
+});
+
+document.getElementById('btn-close-profile').addEventListener('click', () => {
+    profileModal.classList.add('hidden');
+});
+
+document.getElementById('btn-save-profile').addEventListener('click', () => {
+    const newName = profileNameInput.value.trim() || 'Khán giả';
+    localPlayerData.name = newName;
+    localPlayerData.color = selectedColor;
+
+    sendNetwork({
+        type: 'update_profile',
+        name: newName,
+        color: selectedColor
+    });
+
+    profileModal.classList.add('hidden');
+});
+
+// ==========================================
+// 14. UI INITIALIZATION & 500-SEAT MAP
 // ==========================================
 function initUI() {
     const selectRow = document.getElementById('select-row');
@@ -865,15 +1512,46 @@ function initUI() {
 
     document.getElementById('btn-go-seat').addEventListener('click', () => {
         const seatId = `${selectRow.value}${selectCol.value}`;
-        sitAtSeat(seatId);
+        sitDownLocalPlayer(seatId);
     });
 
+    // Camera Mode toggle (3rd person / 1st person / Overview)
+    const btnCameraMode = document.getElementById('btn-camera-mode');
+    function toggleCameraMode() {
+        if (cameraMode === '3rd_person') {
+            cameraMode = '1st_person';
+            btnCameraMode.textContent = '📷 Góc nhìn: Tầm mắt (1st)';
+        } else if (cameraMode === '1st_person') {
+            cameraMode = 'overview';
+            btnCameraMode.textContent = '📷 Góc nhìn: Toàn cảnh rạp';
+            camera.position.set(0, 16, 27);
+            controls.target.set(0, 6, -6);
+        } else {
+            cameraMode = '3rd_person';
+            btnCameraMode.textContent = '📷 Góc nhìn: Sau lưng (3rd)';
+        }
+    }
+    btnCameraMode.addEventListener('click', toggleCameraMode);
+
+    // Presets
     document.querySelectorAll('.preset-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             if (btn.dataset.seat) {
-                sitAtSeat(btn.dataset.seat);
-            } else if (btn.dataset.preset) {
-                setPresetCamera(btn.dataset.preset);
+                sitDownLocalPlayer(btn.dataset.seat);
+            } else if (btn.dataset.preset === 'aisle_center') {
+                if (currentSeatId) standUpLocalPlayer();
+                localPlayerData.x = 0;
+                localPlayerData.z = 8;
+                localPlayerData.y = getFloorElevationAt(0, 8);
+                localAvatar.group.position.set(0, localPlayerData.y, 8);
+                broadcastLocalMovement();
+            } else if (btn.dataset.preset === 'stage') {
+                if (currentSeatId) standUpLocalPlayer();
+                localPlayerData.x = 0;
+                localPlayerData.z = -14;
+                localPlayerData.y = 1.1;
+                localAvatar.group.position.set(0, 1.1, -14);
+                broadcastLocalMovement();
             }
         });
     });
@@ -882,8 +1560,10 @@ function initUI() {
         applyLightMode((lightMode + 1) % 3);
     });
 
+    // Hide/Show UI
     const topBar = document.querySelector('.top-bar');
     const sidePanel = document.getElementById('side-panel');
+    const chatWidget = document.getElementById('chat-widget');
     const bottomBar = document.getElementById('bottom-bar');
     const btnRestore = document.getElementById('btn-restore-ui');
 
@@ -892,6 +1572,7 @@ function initUI() {
         const show = typeof forceShow === 'boolean' ? forceShow : isHidden;
         topBar.classList.toggle('hidden', !show);
         sidePanel.classList.toggle('hidden', !show);
+        chatWidget.classList.toggle('hidden', !show);
         bottomBar.classList.toggle('hidden', !show);
         btnRestore.classList.toggle('hidden', show);
     }
@@ -899,6 +1580,7 @@ function initUI() {
     document.getElementById('btn-toggle-ui').addEventListener('click', () => toggleUIVisibility(false));
     btnRestore.addEventListener('click', () => toggleUIVisibility(true));
 
+    // 2D 500-Seat Map Modal
     const seatmapModal = document.getElementById('seatmap-modal');
     const seatmapGrid = document.getElementById('seatmap-grid');
 
@@ -927,7 +1609,7 @@ function initUI() {
             cell.title = `Ghế ${seatId} - ${cat.name}`;
             cell.addEventListener('click', () => {
                 seatmapModal.classList.add('hidden');
-                sitAtSeat(seatId);
+                sitDownLocalPlayer(seatId);
             });
             rowEl.appendChild(cell);
         }
@@ -950,14 +1632,31 @@ function initUI() {
         if (e.target === seatmapModal) seatmapModal.classList.add('hidden');
     });
 
+    // Keyboard Controls
     const keysPressed = {};
     window.addEventListener('keydown', e => {
         if (document.activeElement.tagName === 'INPUT') return;
+
         keysPressed[e.code] = true;
-        if (e.code === 'KeyH') {
+
+        if (e.code === 'KeyE') {
+            if (currentSeatId) {
+                standUpLocalPlayer();
+            } else {
+                const near = findNearestSeat();
+                if (near) {
+                    sitDownLocalPlayer(near.id);
+                }
+            }
+        } else if (e.code === 'KeyV') {
+            toggleCameraMode();
+        } else if (e.code === 'KeyH') {
             toggleUIVisibility();
+        } else if (e.code === 'Enter') {
+            chatInput.focus();
         }
     });
+
     window.addEventListener('keyup', e => {
         keysPressed[e.code] = false;
     });
@@ -966,7 +1665,42 @@ function initUI() {
 }
 
 // ==========================================
-// 11. DYNAMIC VIDEO AMBILIGHT SAMPLER
+// 15. PROJECTION & FLOATING NAMETAGS LOOP
+// ==========================================
+const tempVec = new THREE.Vector3();
+
+function updateNametags() {
+    const updateOne = (id, pos) => {
+        const el = document.getElementById(`nametag-${id}`);
+        if (!el) return;
+
+        tempVec.copy(pos);
+        tempVec.y += 2.05; // Above character head
+        tempVec.project(camera);
+
+        if (tempVec.z > 1.0) {
+            el.style.display = 'none';
+            return;
+        }
+
+        const screenX = (tempVec.x * 0.5 + 0.5) * window.innerWidth;
+        const screenY = (-(tempVec.y * 0.5) + 0.5) * window.innerHeight;
+
+        el.style.display = 'flex';
+        el.style.transform = `translate(${screenX}px, ${screenY}px) translate(-50%, -100%)`;
+    };
+
+    if (localAvatar && localPlayerId) {
+        updateOne(localPlayerId, localAvatar.group.position);
+    }
+
+    remotePlayers.forEach((remote, id) => {
+        updateOne(id, remote.avatar.group.position);
+    });
+}
+
+// ==========================================
+// 16. AMBILIGHT SAMPLER
 // ==========================================
 function sampleVideoAmbilight() {
     if (activeMediaMode !== 'video' || videoElement.paused || videoElement.readyState < 2) return;
@@ -983,16 +1717,17 @@ function sampleVideoAmbilight() {
         screenGlowCenter.color.lerp(getPixelColor(8, 4), 0.15);
         screenGlowRight.color.lerp(getPixelColor(13, 4), 0.15);
     } catch {
-        // Fallback if CORS blocks pixel extraction
+        // Fallback for CORS
     }
 }
 
 // ==========================================
-// 12. INITIALIZATION & ANIMATION LOOP
+// 17. MAIN ANIMATION & GAME LOOP
 // ==========================================
 buildAuditorium();
 build500Seats();
 initUI();
+initWebSocket();
 applyLightMode(1);
 
 window.addEventListener('resize', () => {
@@ -1002,11 +1737,16 @@ window.addEventListener('resize', () => {
     cssRenderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+let lastTime = performance.now();
 let lastAmbilightSample = 0;
 
 function animate(now) {
     requestAnimationFrame(animate);
 
+    const delta = Math.min((now - lastTime) / 1000, 0.1);
+    lastTime = now;
+
+    // 1. Procedural Demo / Ambilight
     if (activeMediaMode === 'canvas') {
         renderDemoCanvas(now);
     } else if (activeMediaMode === 'video' && now - lastAmbilightSample > 120) {
@@ -1014,46 +1754,99 @@ function animate(now) {
         lastAmbilightSample = now;
     }
 
-    if (cameraAnim) {
-        const elapsed = now - cameraAnim.startTime;
-        const t = Math.min(1, elapsed / cameraAnim.duration);
-        const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-
-        camera.position.lerpVectors(cameraAnim.startPos, cameraAnim.endPos, ease);
-        controls.target.lerpVectors(cameraAnim.startLook, cameraAnim.endLook, ease);
-
-        if (t >= 1) {
-            cameraAnim = null;
-        }
-    }
-
+    // 2. Local Character Movement
     const keys = window.__keysPressed || {};
-    if (keys['KeyW'] || keys['KeyS'] || keys['KeyA'] || keys['KeyD']) {
-        const moveSpeed = 0.22;
-        const forward = new THREE.Vector3();
-        camera.getWorldDirection(forward);
-        forward.y = 0;
-        forward.normalize();
+    let isMoving = false;
 
-        const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
+    if (localAvatar && !currentSeatId) {
+        const moveVec = new THREE.Vector3();
 
-        if (keys['KeyW']) {
-            camera.position.addScaledVector(forward, moveSpeed);
-            controls.target.addScaledVector(forward, moveSpeed);
+        // Get camera forward direction projected onto horizontal plane
+        const camDir = new THREE.Vector3();
+        camera.getWorldDirection(camDir);
+        camDir.y = 0;
+        camDir.normalize();
+
+        const camRight = new THREE.Vector3().crossVectors(camDir, camera.up).normalize();
+
+        if (keys['KeyW'] || keys['ArrowUp']) moveVec.add(camDir);
+        if (keys['KeyS'] || keys['ArrowDown']) moveVec.sub(camDir);
+        if (keys['KeyD'] || keys['ArrowRight']) moveVec.add(camRight);
+        if (keys['KeyA'] || keys['ArrowLeft']) moveVec.sub(camRight);
+
+        if (moveVec.lengthSq() > 0.001) {
+            isMoving = true;
+            moveVec.normalize();
+
+            const speed = 5.6 * delta;
+            localPlayerData.x += moveVec.x * speed;
+            localPlayerData.z += moveVec.z * speed;
+
+            // Boundaries
+            localPlayerData.x = Math.max(-19.5, Math.min(19.5, localPlayerData.x));
+            localPlayerData.z = Math.max(-18.0, Math.min(27.5, localPlayerData.z));
+
+            // Calculate floor height based on stadium risers
+            const targetY = getFloorElevationAt(localPlayerData.x, localPlayerData.z);
+            localPlayerData.y += (targetY - localPlayerData.y) * 0.22;
+
+            // Rotate avatar smoothly to face movement direction
+            const targetYaw = Math.atan2(moveVec.x, moveVec.z);
+            let diff = targetYaw - localPlayerData.yaw;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            localPlayerData.yaw += diff * 0.25;
+
+            localAvatar.group.position.set(localPlayerData.x, localPlayerData.y, localPlayerData.z);
+            localAvatar.group.rotation.y = localPlayerData.yaw;
+
+            localPlayerData.state = 'walking';
+            broadcastLocalMovement();
+
+            // Check if near any seat
+            const nearSeat = findNearestSeat();
+            if (nearSeat) {
+                interactionHud.classList.remove('hidden');
+                interactionText.textContent = `Ngồi vào ghế ${nearSeat.id}`;
+            } else {
+                interactionHud.classList.add('hidden');
+            }
+        } else {
+            if (localPlayerData.state === 'walking') {
+                localPlayerData.state = 'standing';
+                broadcastLocalMovement();
+            }
         }
-        if (keys['KeyS']) {
-            camera.position.addScaledVector(forward, -moveSpeed);
-            controls.target.addScaledVector(forward, -moveSpeed);
-        }
-        if (keys['KeyD']) {
-            camera.position.addScaledVector(right, moveSpeed);
-            controls.target.addScaledVector(right, moveSpeed);
-        }
-        if (keys['KeyA']) {
-            camera.position.addScaledVector(right, -moveSpeed);
-            controls.target.addScaledVector(right, -moveSpeed);
+
+        localAvatar.animateWalk(isMoving, delta);
+
+        // Update Camera Position based on mode
+        if (cameraMode === '3rd_person') {
+            const headPos = new THREE.Vector3(localPlayerData.x, localPlayerData.y + 1.25, localPlayerData.z);
+            const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+            controls.target.copy(headPos);
+            camera.position.copy(headPos).add(offset);
+        } else if (cameraMode === '1st_person') {
+            const eyePos = new THREE.Vector3(localPlayerData.x, localPlayerData.y + 1.45, localPlayerData.z);
+            camera.position.copy(eyePos);
         }
     }
+
+    // 3. Interpolate Remote Players
+    remotePlayers.forEach(remote => {
+        remote.avatar.group.position.lerp(remote.targetPos, 0.2);
+
+        let diff = remote.targetYaw - remote.avatar.group.rotation.y;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        remote.avatar.group.rotation.y += diff * 0.2;
+
+        const isRemoteMoving = remote.state === 'walking';
+        remote.avatar.animateWalk(isRemoteMoving, delta);
+    });
+
+    // 4. Update Floating Nametags & Emote Bubbles
+    updateNametags();
 
     controls.update();
     renderer.render(scene, camera);

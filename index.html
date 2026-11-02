@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Rạp Chiếu Phim 3D IMAX - 500 Chỗ Ngồi</title>
+    <title>Rạp Chiếu Phim 3D IMAX - Multiplayer 500 Chỗ Ngồi</title>
     <link rel="stylesheet" href="style.css" />
     <script type="importmap">
         {
@@ -18,12 +18,19 @@
     <!-- 3D Viewport Containers -->
     <div id="css3d-container"></div>
     <div id="webgl-container"></div>
+    <div id="nametags-container"></div>
 
     <!-- Seat Hover Tooltip -->
     <div id="seat-tooltip" class="hidden">
         <div class="tooltip-seat-id" id="tooltip-title">Ghế I13</div>
         <div class="tooltip-seat-type" id="tooltip-subtitle">Hạng VIP • Chính giữa</div>
-        <div class="tooltip-hint">Nhấp chuột để ngồi vào ghế này</div>
+        <div class="tooltip-hint">Nhấn phím E hoặc Click để ngồi vào ghế này</div>
+    </div>
+
+    <!-- Interaction Prompt (Key E) -->
+    <div id="interaction-hud" class="interaction-hud hidden">
+        <span class="key-badge">E</span>
+        <span id="interaction-text">Ngồi vào ghế I13</span>
     </div>
 
     <!-- Top Header Bar -->
@@ -31,22 +38,28 @@
         <div class="brand">
             <span class="brand-badge">IMAX 3D</span>
             <div>
-                <h1>Rạp Chiếu Phim Không Gian 3D</h1>
-                <p>Sức chứa: <strong>500 Ghế</strong> (20 Hàng A–T × 25 Ghế) • Màn hình 24m × 10m</p>
+                <h1>Rạp Chiếu Phim Multiplayer 3D</h1>
+                <p>Khán phòng <strong>500 Ghế</strong> • Điều khiển nhân vật di chuyển • Xem phim cùng nhau</p>
             </div>
         </div>
 
         <div class="status-pills">
-            <div class="pill">
+            <div class="pill" id="online-pill" title="Số khán giả đang có mặt trong phòng">
                 <span class="dot active"></span>
-                <span>Tổng số ghế: <strong>500</strong></span>
+                <span>Trực tuyến: <strong id="online-count">1</strong> người</span>
             </div>
+            <button id="btn-camera-mode" class="btn btn-secondary pill-btn" title="Đổi góc nhìn nhân vật (Phím V)">
+                📷 Góc nhìn: Sau lưng (3rd)
+            </button>
             <div class="pill" id="current-seat-pill">
-                <span>Vị trí đang ngồi: <strong id="current-seat-label">Toàn cảnh (Tự do)</strong></span>
+                <span>Trạng thái: <strong id="current-seat-label">Đang đi lại</strong></span>
             </div>
         </div>
 
         <div class="top-actions">
+            <button id="btn-profile" class="btn btn-secondary" title="Đổi tên & màu nhân vật">
+                👤 Nhân vật
+            </button>
             <button id="btn-open-seatmap" class="btn btn-secondary" title="Mở sơ đồ 500 ghế">
                 Sơ đồ 500 ghế
             </button>
@@ -59,22 +72,35 @@
         </div>
     </header>
 
-    <!-- Left Quick Camera & Seat Navigation Panel -->
+    <!-- Left Quick Navigation & Legend Panel -->
     <aside class="side-panel glass-panel" id="side-panel">
-        <h3>Góc nhìn & Vị trí</h3>
-        <div class="preset-grid">
-            <button class="preset-btn active" data-preset="overview">Toàn cảnh rạp</button>
-            <button class="preset-btn" data-preset="stage">Từ sân khấu nhìn xuống</button>
-            <button class="preset-btn" data-seat="I13">Giữa rạp VIP (I13)</button>
-            <button class="preset-btn" data-seat="B13">Hàng gần màn hình (B13)</button>
-            <button class="preset-btn" data-seat="T13">Hàng cuối Sweetbox (T13)</button>
-            <button class="preset-btn" data-seat="K4">Cánh trái (K4)</button>
-            <button class="preset-btn" data-seat="K22">Cánh phải (K22)</button>
+        <h3>Điều khiển nhân vật</h3>
+        <div class="controls-help" style="margin-bottom: 6px;">
+            <p><strong>Bàn phím & Chuột:</strong></p>
+            <ul>
+                <li><strong>W, A, S, D:</strong> Di chuyển nhân vật đi lại</li>
+                <li><strong>Giữ chuột phải + Di chuột:</strong> Xoay góc nhìn camera</li>
+                <li><strong>Phím E:</strong> Ngồi xuống ghế / Đứng dậy</li>
+                <li><strong>Phím V:</strong> Đổi góc nhìn (Sau lưng / Tầm mắt / Toàn cảnh)</li>
+                <li><strong>Phím Enter:</strong> Bật khung chat nói chuyện</li>
+                <li><strong>Click chuột trái vào ghế:</strong> Đi tới và ngồi vào ghế</li>
+            </ul>
         </div>
 
         <hr class="divider" />
 
-        <h3>Chọn nhanh chỗ ngồi (500 ghế)</h3>
+        <h3>Dịch chuyển nhanh nhân vật</h3>
+        <div class="preset-grid">
+            <button class="preset-btn" data-preset="aisle_center">Lối đi giữa rạp</button>
+            <button class="preset-btn" data-preset="stage">Sân khấu trước màn hình</button>
+            <button class="preset-btn" data-seat="I13">Ghế giữa VIP (I13)</button>
+            <button class="preset-btn" data-seat="B13">Hàng đầu (B13)</button>
+            <button class="preset-btn" data-seat="T13">Hàng cuối Sweetbox (T13)</button>
+        </div>
+
+        <hr class="divider" />
+
+        <h3>Chọn ghế ngồi nhanh (500 ghế)</h3>
         <div class="quick-seat-selector">
             <div class="field-group">
                 <label for="select-row">Hàng ghế (A - T)</label>
@@ -85,7 +111,7 @@
                 <select id="select-col"></select>
             </div>
         </div>
-        <button id="btn-go-seat" class="btn btn-primary full-width">Di chuyển tới ghế này</button>
+        <button id="btn-go-seat" class="btn btn-primary full-width">Ngồi vào ghế này (E)</button>
 
         <hr class="divider" />
 
@@ -100,24 +126,32 @@
             </div>
             <div class="legend-item">
                 <span class="swatch couple"></span>
-                <span>Ghế Đôi/Sweetbox (S–T): 50 ghế</span>
-            </div>
-            <div class="legend-item">
-                <span class="swatch current"></span>
-                <span>Ghế bạn đang ngồi</span>
+                <span>Sweetbox / Đôi (S–T): 50 ghế</span>
             </div>
         </div>
+    </aside>
 
-        <div class="controls-help">
-            <p><strong>Điều khiển chuột & phím:</strong></p>
-            <ul>
-                <li><strong>Click vào ghế 3D:</strong> Ngồi vào ghế đó</li>
-                <li><strong>Chuột trái + Kéo:</strong> Xoay góc nhìn</li>
-                <li><strong>Chuột phải + Kéo:</strong> Di chuyển camera</li>
-                <li><strong>Con lăn chuột:</strong> Phóng to / Thu nhỏ</li>
-                <li><strong>W, A, S, D:</strong> Di chuyển tự do trong rạp</li>
-            </ul>
+    <!-- Right Live Multiplayer Chat & Reaction Panel -->
+    <aside class="chat-widget glass-panel" id="chat-widget">
+        <div class="chat-header">
+            <span>Trò chuyện trong rạp</span>
+            <span id="chat-status" style="font-size: 0.72rem; color: #10b981;">🟢 Đã kết nối</span>
         </div>
+        <div class="chat-messages" id="chat-messages">
+            <div class="chat-msg system">Chào mừng bạn đến với Rạp Phim IMAX 3D! Dùng phím W, A, S, D để di chuyển nhân vật.</div>
+        </div>
+        <div class="chat-emotes-bar">
+            <button class="emote-btn" data-emote="🍿" title="Bắp rang bơ">🍿</button>
+            <button class="emote-btn" data-emote="👏" title="Vỗ tay">👏</button>
+            <button class="emote-btn" data-emote="❤️" title="Thả tim">❤️</button>
+            <button class="emote-btn" data-emote="😂" title="Cười lớn">😂</button>
+            <button class="emote-btn" data-emote="🎬" title="Phim hay">🎬</button>
+            <button class="emote-btn" data-emote="🥤" title="Nước ngọt">🥤</button>
+        </div>
+        <form id="chat-form" class="chat-input-bar">
+            <input type="text" id="chat-input" placeholder="Nhập tin nhắn (Enter)..." maxlength="120" autocomplete="off" />
+            <button type="submit" class="btn btn-primary" style="padding: 6px 12px;">Gửi</button>
+        </form>
     </aside>
 
     <!-- Bottom Video & Media Control Dock -->
@@ -171,13 +205,35 @@
         Hiện điều khiển (H)
     </button>
 
+    <!-- Profile / Avatar Customization Modal -->
+    <div id="profile-modal" class="modal-backdrop hidden">
+        <div class="modal-content small glass-panel">
+            <div class="modal-header">
+                <div>
+                    <h2>Nhân Vật Của Bạn</h2>
+                    <p>Tùy chỉnh tên hiển thị và màu áo nhân vật trong rạp phim</p>
+                </div>
+                <button id="btn-close-profile" class="btn btn-icon">✕</button>
+            </div>
+            <div class="field-group">
+                <label for="profile-name-input">Tên hiển thị trên đầu nhân vật</label>
+                <input type="text" id="profile-name-input" class="modal-input" maxlength="20" placeholder="Ví dụ: Hoàng Long, Minh Thư..." />
+            </div>
+            <div class="field-group">
+                <label>Chọn màu áo nhân vật</label>
+                <div class="avatar-color-options" id="color-options-container"></div>
+            </div>
+            <button id="btn-save-profile" class="btn btn-primary full-width">Lưu & Tiếp tục</button>
+        </div>
+    </div>
+
     <!-- 2D 500-Seat Map Modal -->
     <div id="seatmap-modal" class="modal-backdrop hidden">
         <div class="modal-content glass-panel">
             <div class="modal-header">
                 <div>
                     <h2>Sơ Đồ 500 Chỗ Ngồi Trong Rạp</h2>
-                    <p>Chọn bất kỳ ghế nào để bay đến vị trí ngồi đó trong không gian 3D</p>
+                    <p>Chọn bất kỳ ghế nào để nhân vật của bạn di chuyển tới ngồi xem phim</p>
                 </div>
                 <button id="btn-close-seatmap" class="btn btn-icon">✕</button>
             </div>
@@ -195,7 +251,7 @@
                     <span><i class="swatch standard"></i> Thường (A–H: 200 ghế)</span>
                     <span><i class="swatch vip"></i> VIP (I–R: 250 ghế)</span>
                     <span><i class="swatch couple"></i> Sweetbox (S–T: 50 ghế)</span>
-                    <span><i class="swatch current"></i> Đang ngồi</span>
+                    <span><i class="swatch current"></i> Bạn đang ngồi</span>
                 </div>
             </div>
         </div>

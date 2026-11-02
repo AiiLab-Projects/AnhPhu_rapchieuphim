@@ -28,7 +28,8 @@ body, html {
 }
 
 #css3d-container,
-#webgl-container {
+#webgl-container,
+#nametags-container {
     position: fixed;
     inset: 0;
     width: 100%;
@@ -51,6 +52,12 @@ body, html {
 
 #webgl-container {
     z-index: 2;
+}
+
+#nametags-container {
+    z-index: 4;
+    pointer-events: none;
+    overflow: hidden;
 }
 
 .glass-panel {
@@ -112,6 +119,7 @@ body, html {
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
 }
 
 .pill {
@@ -172,6 +180,12 @@ body, html {
 
 .btn-secondary:hover {
     background: rgba(255, 255, 255, 0.18);
+}
+
+.pill-btn {
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 0.82rem;
 }
 
 .btn-upload {
@@ -285,7 +299,9 @@ body, html {
 
 .field-group select,
 .sample-group select,
-.url-group input {
+.url-group input,
+.chat-input-bar input,
+.modal-input {
     background: rgba(0, 0, 0, 0.45);
     border: 1px solid rgba(255, 255, 255, 0.18);
     color: #fff;
@@ -453,6 +469,226 @@ body, html {
     z-index: 20;
 }
 
+/* Interaction HUD (Key E prompt) */
+.interaction-hud {
+    position: fixed;
+    bottom: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    background: rgba(15, 23, 42, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    padding: 8px 16px;
+    border-radius: 30px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.88rem;
+    animation: bounce 1.6s infinite ease-in-out;
+}
+
+.key-badge {
+    background: #ef4444;
+    color: #fff;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.76rem;
+    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.5);
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translate(-50%, 0); }
+    50% { transform: translate(-50%, -6px); }
+}
+
+/* ==========================================
+   MULTIPLAYER CHAT & EMOTES OVERLAY
+   ========================================== */
+.chat-widget {
+    position: fixed;
+    right: 16px;
+    top: 84px;
+    width: 320px;
+    max-height: calc(100vh - 205px);
+    z-index: 10;
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    gap: 10px;
+}
+
+.chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.chat-messages {
+    flex: 1;
+    min-height: 150px;
+    max-height: 240px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-right: 4px;
+}
+
+.chat-msg {
+    font-size: 0.8rem;
+    line-height: 1.35;
+    padding: 5px 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    word-break: break-word;
+    user-select: text;
+}
+
+.chat-msg .sender {
+    font-weight: 700;
+    margin-right: 5px;
+}
+
+.chat-msg.system {
+    color: #93c5fd;
+    font-style: italic;
+    background: transparent;
+    padding: 2px 4px;
+}
+
+.chat-emotes-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    justify-content: space-between;
+}
+
+.emote-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    padding: 4px 6px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.emote-btn:hover {
+    transform: scale(1.2);
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.chat-input-bar {
+    display: flex;
+    gap: 6px;
+}
+
+.chat-input-bar input {
+    flex: 1;
+    user-select: text;
+}
+
+/* ==========================================
+   3D FLOATING NAMETAGS & SPEECH BUBBLES
+   ========================================== */
+.player-nametag {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+
+.nametag-label {
+    background: rgba(10, 14, 25, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #fff;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
+
+.nametag-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.nametag-bubble {
+    background: #ffffff;
+    color: #0f172a;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 12px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+    margin-bottom: 6px;
+    position: relative;
+    max-width: 180px;
+    text-align: center;
+    word-break: break-word;
+    animation: popBubble 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.nametag-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 5px 5px 0 5px;
+    border-style: solid;
+    border-color: #ffffff transparent transparent transparent;
+}
+
+@keyframes popBubble {
+    0% { transform: scale(0.6); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* ==========================================
+   PROFILE & COLOR PICKER MODAL
+   ========================================== */
+.avatar-color-options {
+    display: flex;
+    gap: 10px;
+    margin: 10px 0 16px;
+    justify-content: center;
+}
+
+.color-option {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.15s;
+}
+
+.color-option:hover {
+    transform: scale(1.15);
+}
+
+.color-option.selected {
+    border-color: #fff;
+    box-shadow: 0 0 12px currentColor;
+    transform: scale(1.2);
+}
+
 /* 2D 500-Seat Map Modal */
 .modal-backdrop {
     position: fixed;
@@ -473,6 +709,10 @@ body, html {
     display: flex;
     flex-direction: column;
     gap: 14px;
+}
+
+.modal-content.small {
+    width: min(440px, 92vw);
 }
 
 .modal-header {
@@ -592,6 +832,9 @@ body, html {
 
 @media (max-width: 900px) {
     .side-panel {
+        display: none;
+    }
+    .chat-widget {
         display: none;
     }
 }
