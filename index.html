@@ -73,8 +73,12 @@
     </header>
 
     <!-- Left Quick Navigation & Legend Panel -->
+    <button id="btn-expand-side" class="btn btn-secondary floating-side-toggle hidden" title="Mở bảng điều khiển">🎮 Điều khiển</button>
     <aside class="side-panel glass-panel" id="side-panel">
-        <h3>Điều khiển nhân vật</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>Điều khiển nhân vật</h3>
+            <button id="btn-collapse-side" class="btn btn-icon" style="padding: 2px 7px; font-size: 0.72rem;" title="Thu gọn bảng">✕</button>
+        </div>
         <div class="controls-help" style="margin-bottom: 6px;">
             <p><strong>Bàn phím & Chuột:</strong></p>
             <ul>
@@ -132,10 +136,14 @@
     </aside>
 
     <!-- Right Live Multiplayer Chat & Reaction Panel -->
+    <button id="btn-expand-chat" class="btn btn-secondary floating-chat-toggle hidden" title="Mở khung chat">💬 Trò chuyện</button>
     <aside class="chat-widget glass-panel" id="chat-widget">
         <div class="chat-header">
             <span>Trò chuyện trong rạp</span>
-            <span id="chat-status" style="font-size: 0.72rem; color: #10b981;">🟢 Đã kết nối</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <span id="chat-status" style="font-size: 0.72rem; color: #10b981;">🟢 Đã kết nối</span>
+                <button id="btn-collapse-chat" class="btn btn-icon" style="padding: 2px 7px; font-size: 0.72rem;" title="Thu gọn chat">✕</button>
+            </div>
         </div>
         <div class="chat-messages" id="chat-messages">
             <div class="chat-msg system">Chào mừng bạn đến với Rạp Phim IMAX 3D! Dùng phím W, A, S, D để di chuyển nhân vật.</div>

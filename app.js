@@ -1609,6 +1609,33 @@ function initUI() {
     document.getElementById('btn-toggle-ui').addEventListener('click', () => toggleUIVisibility(false));
     btnRestore.addEventListener('click', () => toggleUIVisibility(true));
 
+    // Collapse/Expand Side Panel & Chat
+    const btnCollapseSide = document.getElementById('btn-collapse-side');
+    const btnExpandSide = document.getElementById('btn-expand-side');
+    if (btnCollapseSide && btnExpandSide) {
+        btnCollapseSide.addEventListener('click', () => {
+            sidePanel.classList.add('hidden');
+            btnExpandSide.classList.remove('hidden');
+        });
+        btnExpandSide.addEventListener('click', () => {
+            sidePanel.classList.remove('hidden');
+            btnExpandSide.classList.add('hidden');
+        });
+    }
+
+    const btnCollapseChat = document.getElementById('btn-collapse-chat');
+    const btnExpandChat = document.getElementById('btn-expand-chat');
+    if (btnCollapseChat && btnExpandChat) {
+        btnCollapseChat.addEventListener('click', () => {
+            chatWidget.classList.add('hidden');
+            btnExpandChat.classList.remove('hidden');
+        });
+        btnExpandChat.addEventListener('click', () => {
+            chatWidget.classList.remove('hidden');
+            btnExpandChat.classList.add('hidden');
+        });
+    }
+
     // 2D 500-Seat Map Modal
     const seatmapModal = document.getElementById('seatmap-modal');
     const seatmapGrid = document.getElementById('seatmap-grid');
