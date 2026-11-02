@@ -830,6 +830,20 @@ function handleNetworkMessage(msg) {
             localPlayerId = msg.playerId;
             localPlayerData = msg.playerData;
 
+            try {
+                const savedName = localStorage.getItem('cinema_avatar_name');
+                const savedColor = localStorage.getItem('cinema_avatar_color');
+                if (savedName) localPlayerData.name = savedName;
+                if (savedColor) localPlayerData.color = savedColor;
+                if (savedName || savedColor) {
+                    sendNetwork({
+                        type: 'update_profile',
+                        name: localPlayerData.name,
+                        color: localPlayerData.color
+                    });
+                }
+            } catch (e) {}
+
             // Spawn local avatar
             localAvatar = createAvatar(localPlayerData.color, true);
             localAvatar.group.position.set(localPlayerData.x, localPlayerData.y, localPlayerData.z);
@@ -1466,16 +1480,23 @@ document.getElementById('btn-profile').addEventListener('click', () => {
         el.classList.toggle('selected', el.dataset.color === selectedColor);
     });
     profileModal.classList.remove('hidden');
+    profileNameInput.focus();
+    profileNameInput.select();
 });
 
 document.getElementById('btn-close-profile').addEventListener('click', () => {
     profileModal.classList.add('hidden');
 });
 
-document.getElementById('btn-save-profile').addEventListener('click', () => {
+function saveProfile() {
     const newName = profileNameInput.value.trim() || 'Khán giả';
     localPlayerData.name = newName;
     localPlayerData.color = selectedColor;
+
+    try {
+        localStorage.setItem('cinema_avatar_name', newName);
+        localStorage.setItem('cinema_avatar_color', selectedColor);
+    } catch (e) {}
 
     sendNetwork({
         type: 'update_profile',
@@ -1484,6 +1505,14 @@ document.getElementById('btn-save-profile').addEventListener('click', () => {
     });
 
     profileModal.classList.add('hidden');
+}
+
+document.getElementById('btn-save-profile').addEventListener('click', saveProfile);
+profileNameInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        saveProfile();
+    }
 });
 
 // ==========================================
