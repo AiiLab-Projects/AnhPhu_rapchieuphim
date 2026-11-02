@@ -9,9 +9,9 @@ const ROWS = [
 ]; // 20 rows
 const COLS = 25; // 25 seats per row -> 20 * 25 = 500 seats
 
-const SCREEN_WIDTH = 24;
-const SCREEN_HEIGHT = 10.2;
-const SCREEN_POS = new THREE.Vector3(0, 7.4, -18.5);
+const SCREEN_WIDTH = 34.0;
+const SCREEN_HEIGHT = 15.0;
+const SCREEN_POS = new THREE.Vector3(0, 8.8, -18.6);
 
 // State
 const seatsData = new Map(); // id -> seat metadata & meshes
@@ -101,16 +101,16 @@ ceilingLightPositions.forEach(([x, y, z]) => {
 });
 
 // Screen Ambilight
-const screenGlowCenter = new THREE.PointLight(0x4f8cff, 85, 48, 1.3);
-screenGlowCenter.position.set(0, SCREEN_POS.y, SCREEN_POS.z + 2.5);
+const screenGlowCenter = new THREE.PointLight(0x4f8cff, 110, 55, 1.2);
+screenGlowCenter.position.set(0, SCREEN_POS.y, SCREEN_POS.z + 3.0);
 scene.add(screenGlowCenter);
 
-const screenGlowLeft = new THREE.PointLight(0x3b82f6, 45, 38, 1.4);
-screenGlowLeft.position.set(-8, SCREEN_POS.y, SCREEN_POS.z + 2.5);
+const screenGlowLeft = new THREE.PointLight(0x3b82f6, 60, 45, 1.3);
+screenGlowLeft.position.set(-13, SCREEN_POS.y, SCREEN_POS.z + 3.0);
 scene.add(screenGlowLeft);
 
-const screenGlowRight = new THREE.PointLight(0xec4899, 45, 38, 1.4);
-screenGlowRight.position.set(8, SCREEN_POS.y, SCREEN_POS.z + 2.5);
+const screenGlowRight = new THREE.PointLight(0xec4899, 60, 45, 1.3);
+screenGlowRight.position.set(13, SCREEN_POS.y, SCREEN_POS.z + 3.0);
 scene.add(screenGlowRight);
 
 function applyLightMode(mode) {
@@ -146,8 +146,8 @@ videoTexture.magFilter = THREE.LinearFilter;
 videoTexture.colorSpace = THREE.SRGBColorSpace;
 
 const demoCanvas = document.createElement('canvas');
-demoCanvas.width = 1280;
-demoCanvas.height = 544;
+demoCanvas.width = 1920;
+demoCanvas.height = 848;
 const demoCtx = demoCanvas.getContext('2d');
 
 const demoTexture = new THREE.CanvasTexture(demoCanvas);
@@ -160,9 +160,9 @@ ambilightCanvas.width = 16;
 ambilightCanvas.height = 9;
 const ambilightCtx = ambilightCanvas.getContext('2d', { willReadFrequently: true });
 
-const stars = Array.from({ length: 120 }, () => ({
-    x: (Math.random() - 0.5) * 1280,
-    y: (Math.random() - 0.5) * 544,
+const stars = Array.from({ length: 150 }, () => ({
+    x: (Math.random() - 0.5) * 1920,
+    y: (Math.random() - 0.5) * 848,
     z: Math.random() * 1000 + 50
 }));
 
@@ -284,12 +284,12 @@ function buildAuditorium() {
     baseFloor.position.set(0, -0.25, 4);
     hallGroup.add(baseFloor);
 
-    // Stage
-    const stage = new THREE.Mesh(new THREE.BoxGeometry(36, 1.1, 7), stageMat);
+    // Stage (widescreen stage spanning below the giant screen)
+    const stage = new THREE.Mesh(new THREE.BoxGeometry(40, 1.1, 7), stageMat);
     stage.position.set(0, 0.55, -16);
     hallGroup.add(stage);
 
-    const stageLed = new THREE.Mesh(new THREE.BoxGeometry(36, 0.08, 0.08), new THREE.MeshBasicMaterial({ color: 0x3b82f6 }));
+    const stageLed = new THREE.Mesh(new THREE.BoxGeometry(40, 0.08, 0.08), new THREE.MeshBasicMaterial({ color: 0x3b82f6 }));
     stageLed.position.set(0, 1.11, -12.5);
     hallGroup.add(stageLed);
 
@@ -307,15 +307,15 @@ function buildAuditorium() {
     screenMesh.position.copy(SCREEN_POS);
     hallGroup.add(screenMesh);
 
-    // CSS3D YouTube Screen
+    // CSS3D YouTube Screen (High-definition 1600x706 matching giant aspect ratio)
     const ytWrapper = document.createElement('div');
-    ytWrapper.style.width = '1200px';
-    ytWrapper.style.height = '510px';
+    ytWrapper.style.width = '1600px';
+    ytWrapper.style.height = '706px';
     ytWrapper.style.background = '#000';
 
     youtubeIframe = document.createElement('iframe');
-    youtubeIframe.style.width = '1200px';
-    youtubeIframe.style.height = '510px';
+    youtubeIframe.style.width = '1600px';
+    youtubeIframe.style.height = '706px';
     youtubeIframe.style.border = 'none';
     youtubeIframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
     youtubeIframe.allowFullscreen = true;
@@ -323,14 +323,14 @@ function buildAuditorium() {
 
     youtubeCssObject = new CSS3DObject(ytWrapper);
     youtubeCssObject.position.copy(SCREEN_POS);
-    youtubeCssObject.scale.set(SCREEN_WIDTH / 1200, SCREEN_HEIGHT / 510, 1);
+    youtubeCssObject.scale.set(SCREEN_WIDTH / 1600, SCREEN_HEIGHT / 706, 1);
     youtubeCssObject.visible = false;
     cssScene.add(youtubeCssObject);
 
-    // Speakers
-    const speakerGeo = new THREE.BoxGeometry(1.6, 5.5, 1.2);
+    // Side Stage Speaker Arrays flanking the giant screen
+    const speakerGeo = new THREE.BoxGeometry(1.6, 7.5, 1.2);
     const speakerMat = new THREE.MeshStandardMaterial({ color: 0x101218, roughness: 0.5, metalness: 0.4 });
-    [-14.5, 14.5].forEach(xPos => {
+    [-18.8, 18.8].forEach(xPos => {
         const spk = new THREE.Mesh(speakerGeo, speakerMat);
         spk.position.set(xPos, SCREEN_POS.y, SCREEN_POS.z + 0.3);
         hallGroup.add(spk);
