@@ -25,6 +25,7 @@ let activeMediaMode = 'canvas'; // 'canvas' | 'video' | 'youtube'
 let cameraAnim = null;
 // Camera modes: '3rd_person' | '1st_person' | 'overview'
 let cameraMode = '3rd_person';
+let lastFollowPos = null;
 
 // ==========================================
 // 2. SCENE, CAMERA & RENDERERS
@@ -1066,6 +1067,7 @@ function sitDownLocalPlayer(seatId) {
     controls.target.copy(lookTarget);
     controls.minDistance = 0.05;
     controls.maxDistance = 1.0;
+    lastFollowPos = null;
 }
 
 function standUpLocalPlayer() {
@@ -1087,6 +1089,7 @@ function standUpLocalPlayer() {
     localAvatar.headGroup.visible = true;
     controls.minDistance = 0.6;
     controls.maxDistance = 6.8;
+    lastFollowPos = null;
 
     sendNetwork({
         type: 'stand',
@@ -1555,6 +1558,7 @@ function initUI() {
     // Camera Mode toggle (3rd person / 1st person / Overview)
     const btnCameraMode = document.getElementById('btn-camera-mode');
     function toggleCameraMode() {
+        lastFollowPos = null;
         if (cameraMode === '3rd_person') {
             cameraMode = '1st_person';
             controls.minDistance = 0.05;
@@ -1896,41 +1900,34 @@ function animate(now) {
 
         localAvatar.animateWalk(isMoving, delta);
 
-        // Update Camera Position based on mode
+        // Update Camera Position based on mode (Tịnh tiến theo nhân vật mượt mà, KHÔNG bị vòng lặp tự xoay)
         if (cameraMode === '3rd_person') {
             const headPos = new THREE.Vector3(localPlayerData.x, localPlayerData.y + 1.25, localPlayerData.z);
-            let offset = new THREE.Vector3().subVectors(camera.position, controls.target);
-            let dist = offset.length();
-            if (dist < 0.1 || !isFinite(dist)) {
-                offset.set(0, 0.9, 3.2);
-                dist = offset.length();
+            if (!lastFollowPos) {
+                lastFollowPos = headPos.clone();
+                controls.target.copy(headPos);
             }
-            // Keep 3rd person camera distance tight and comfortable (0.8m to 5.5m)
-            dist = Math.max(0.8, Math.min(5.5, dist));
-            offset.normalize().multiplyScalar(dist);
-
-            // Over-the-shoulder offset: dịch camera sang vai phải để nhân vật đứng lệch góc, KHÔNG BAO GIỜ che màn hình chính giữa
-            const camDir = new THREE.Vector3().copy(offset).negate().normalize();
-            const camRight = new THREE.Vector3().crossVectors(camDir, new THREE.Vector3(0, 1, 0)).normalize();
-            const shoulderShift = camRight.clone().multiplyScalar(0.48);
-
-            controls.target.copy(headPos).add(new THREE.Vector3(0, 0.2, 0));
-            camera.position.copy(headPos).add(offset).add(shoulderShift);
+            const deltaMove = new THREE.Vector3().subVectors(headPos, lastFollowPos);
+            controls.target.add(deltaMove);
+            camera.position.add(deltaMove);
+            lastFollowPos.copy(headPos);
 
             if (currentSeatId) {
                 localAvatar.group.visible = false;
             } else {
                 localAvatar.group.visible = true;
-                // Khi zoom gần lại, tự động ẩn phần đầu nhân vật để không bao giờ chắn màn phim
-                localAvatar.headGroup.visible = (dist > 1.3);
+                const dist = camera.position.distanceTo(controls.target);
+                localAvatar.headGroup.visible = (dist > 1.2);
             }
         } else if (cameraMode === '1st_person') {
             const eyePos = new THREE.Vector3(localPlayerData.x, localPlayerData.y + 1.45, localPlayerData.z);
             camera.position.copy(eyePos);
             localAvatar.group.visible = false;
+            if (lastFollowPos) lastFollowPos.copy(eyePos);
         } else {
             localAvatar.group.visible = true;
             localAvatar.headGroup.visible = true;
+            lastFollowPos = null;
         }
     }
 
