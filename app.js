@@ -10,8 +10,8 @@ const ROWS = [
 const COLS = 25; // 25 seats per row -> 20 * 25 = 500 seats
 
 const SCREEN_WIDTH = 34.0;
-const SCREEN_HEIGHT = 15.0;
-const SCREEN_POS = new THREE.Vector3(0, 8.8, -18.6);
+const SCREEN_HEIGHT = 14.8;
+const SCREEN_POS = new THREE.Vector3(0, 10.4, -18.6);
 
 // State
 const seatsData = new Map(); // id -> seat metadata & meshes
@@ -1042,6 +1042,7 @@ function sitDownLocalPlayer(seatId) {
     localAvatar.group.position.copy(seat.sitPosition);
     localAvatar.group.rotation.y = seat.yaw;
     localAvatar.setSittingPose(true);
+    localAvatar.group.visible = false; // Ẩn avatar của chính mình khi ngồi để tầm nhìn xem phim 100% không bị che
 
     sendNetwork({
         type: 'sit',
@@ -1055,16 +1056,16 @@ function sitDownLocalPlayer(seatId) {
     updateSeatVisuals();
     document.getElementById('current-seat-label').textContent = `Đang ngồi ghế ${seatId}`;
     interactionHud.classList.remove('hidden');
-    interactionText.textContent = `Đứng dậy khỏi ghế ${seatId}`;
+    interactionText.textContent = `Đứng dậy khỏi ghế ${seatId} (Phím E)`;
 
-    // Adjust camera to a majestic cinema viewing angle
+    // Camera đặt ngang tầm mắt xem phim trực diện lên màn hình IMAX, không bị lưng ghế che
     const eyePos = seat.eyePosition.clone();
-    const dirToScreen = new THREE.Vector3().subVectors(SCREEN_POS, eyePos).normalize();
-    const lookTarget = eyePos.clone().add(dirToScreen.multiplyScalar(15));
+    camera.position.set(eyePos.x, eyePos.y + 0.1, eyePos.z - 0.05);
+    const dirToScreen = new THREE.Vector3().subVectors(SCREEN_POS, camera.position).normalize();
+    const lookTarget = camera.position.clone().add(dirToScreen.multiplyScalar(20));
     controls.target.copy(lookTarget);
-    camera.position.set(eyePos.x, eyePos.y + 0.35, eyePos.z + 0.4);
-    controls.minDistance = 0.15;
-    controls.maxDistance = 1.2;
+    controls.minDistance = 0.05;
+    controls.maxDistance = 1.0;
 }
 
 function standUpLocalPlayer() {
@@ -1082,6 +1083,8 @@ function standUpLocalPlayer() {
         localAvatar.group.position.set(localPlayerData.x, localPlayerData.y, localPlayerData.z);
     }
     localAvatar.setSittingPose(false);
+    localAvatar.group.visible = true;
+    localAvatar.headGroup.visible = true;
     controls.minDistance = 0.6;
     controls.maxDistance = 6.8;
 
@@ -1757,8 +1760,14 @@ function updateNametags() {
         el.style.transform = `translate(${screenX}px, ${screenY}px) translate(-50%, -100%)`;
     };
 
-    if (localAvatar && localPlayerId) {
+    // Only render nametag for local player if they sent a speech bubble/emote (so their own nametag never blocks the cinema screen)
+    const localBubble = document.getElementById(`bubble-${localPlayerId}`);
+    const isLocalBubbleActive = localBubble && !localBubble.classList.contains('hidden');
+    if (localAvatar && localPlayerId && isLocalBubbleActive) {
         updateOne(localPlayerId, localAvatar.group.position);
+    } else {
+        const localEl = document.getElementById(`nametag-${localPlayerId}`);
+        if (localEl) localEl.style.display = 'none';
     }
 
     remotePlayers.forEach((remote, id) => {
@@ -1896,15 +1905,32 @@ function animate(now) {
                 offset.set(0, 0.9, 3.2);
                 dist = offset.length();
             }
-            // Keep 3rd person camera distance tight and comfortable (0.6m to 6.5m)
-            dist = Math.max(0.6, Math.min(6.5, dist));
+            // Keep 3rd person camera distance tight and comfortable (0.8m to 5.5m)
+            dist = Math.max(0.8, Math.min(5.5, dist));
             offset.normalize().multiplyScalar(dist);
 
-            controls.target.copy(headPos);
-            camera.position.copy(headPos).add(offset);
+            // Over-the-shoulder offset: dịch camera sang vai phải để nhân vật đứng lệch góc, KHÔNG BAO GIỜ che màn hình chính giữa
+            const camDir = new THREE.Vector3().copy(offset).negate().normalize();
+            const camRight = new THREE.Vector3().crossVectors(camDir, new THREE.Vector3(0, 1, 0)).normalize();
+            const shoulderShift = camRight.clone().multiplyScalar(0.48);
+
+            controls.target.copy(headPos).add(new THREE.Vector3(0, 0.2, 0));
+            camera.position.copy(headPos).add(offset).add(shoulderShift);
+
+            if (currentSeatId) {
+                localAvatar.group.visible = false;
+            } else {
+                localAvatar.group.visible = true;
+                // Khi zoom gần lại, tự động ẩn phần đầu nhân vật để không bao giờ chắn màn phim
+                localAvatar.headGroup.visible = (dist > 1.3);
+            }
         } else if (cameraMode === '1st_person') {
             const eyePos = new THREE.Vector3(localPlayerData.x, localPlayerData.y + 1.45, localPlayerData.z);
             camera.position.copy(eyePos);
+            localAvatar.group.visible = false;
+        } else {
+            localAvatar.group.visible = true;
+            localAvatar.headGroup.visible = true;
         }
     }
 
