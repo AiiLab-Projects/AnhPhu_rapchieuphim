@@ -57,6 +57,9 @@
         </div>
 
         <div class="top-actions">
+            <button id="btn-open-theater-2d" class="btn btn-primary" title="Bật chế độ xem phim 2D trực diện (Không bị ghế hay nhân vật che)">
+                🎬 Màn hình 2D
+            </button>
             <button id="btn-profile" class="btn btn-secondary" title="Đổi tên & màu nhân vật">
                 👤 Nhân vật
             </button>
@@ -179,6 +182,7 @@
                     placeholder="Dán link video MP4 hoặc link YouTube (VD: https://www.youtube.com/watch?v=...) rồi nhấn Chiếu..."
                 />
                 <button id="btn-load-url" class="btn btn-primary">Chiếu lên màn hình</button>
+                <button id="btn-open-theater-2d-bottom" class="btn btn-secondary" style="white-space: nowrap;" title="Xem ở chế độ 2D trực diện không bị che">🎬 Màn hình 2D</button>
             </div>
 
             <div class="sample-group">
@@ -212,6 +216,28 @@
     <button id="btn-restore-ui" class="btn btn-primary floating-restore hidden">
         Hiện điều khiển (H)
     </button>
+
+    <!-- 2D Theater Overlay Mode (Xem trực tiếp không bị ghế hay nhân vật che) -->
+    <div id="theater-2d-overlay" class="theater-2d-backdrop hidden">
+        <div class="theater-2d-header glass-panel" style="padding: 10px 18px; border-radius: 12px;">
+            <div class="brand">
+                <span class="brand-badge" style="background: linear-gradient(135deg, #2563eb, #1d4ed8);">RẠP PHIM 2D</span>
+                <div>
+                    <h2 id="theater-2d-title" style="font-size: 1.05rem;">Màn Hình Chiếu Phim 2D Trực Diện</h2>
+                    <p style="font-size: 0.78rem; color: var(--text-muted);">Hình ảnh chuẩn 100% không bị ghế hay nhân vật che • Âm thanh đồng bộ phòng rạp</p>
+                </div>
+            </div>
+            <div class="top-actions">
+                <button id="btn-close-theater-2d" class="btn btn-primary" title="Quay trở lại không gian phòng rạp 3D">
+                    ◀ Trở về rạp 3D
+                </button>
+            </div>
+        </div>
+
+        <div class="theater-2d-screen-wrapper">
+            <div id="theater-2d-media-slot" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;"></div>
+        </div>
+    </div>
 
     <!-- Profile / Avatar Customization Modal -->
     <div id="profile-modal" class="modal-backdrop hidden">

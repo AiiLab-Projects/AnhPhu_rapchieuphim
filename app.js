@@ -256,6 +256,7 @@ const screenMaterial = new THREE.MeshBasicMaterial({
 let screenMesh;
 let youtubeCssObject = null;
 let youtubeIframe = null;
+let ytWrapper = null;
 
 function buildAuditorium() {
     const hallGroup = new THREE.Group();
@@ -310,7 +311,7 @@ function buildAuditorium() {
     hallGroup.add(screenMesh);
 
     // CSS3D YouTube Screen (High-definition 1600x706 matching giant aspect ratio)
-    const ytWrapper = document.createElement('div');
+    ytWrapper = document.createElement('div');
     ytWrapper.style.width = '1600px';
     ytWrapper.style.height = '706px';
     ytWrapper.style.background = '#000';
@@ -1242,6 +1243,8 @@ function switchToCanvasDemo(sync = true) {
     youtubeNotice.classList.add('hidden');
     btnPlayPause.textContent = 'Đang chạy Demo';
 
+    if (is2dTheaterActive) refresh2dTheaterSlot();
+
     if (sync) {
         sendNetwork({
             type: 'sync_video',
@@ -1275,6 +1278,8 @@ function loadDirectVideo(srcUrl, sync = true, startTime = 0) {
     playbackControls.classList.remove('hidden');
     youtubeNotice.classList.add('hidden');
 
+    if (is2dTheaterActive) refresh2dTheaterSlot();
+
     if (sync) {
         sendNetwork({
             type: 'sync_video',
@@ -1295,6 +1300,8 @@ function loadYouTubeVideo(videoId, sync = true) {
     css3dContainer.classList.add('youtube-active');
     playbackControls.classList.add('hidden');
     youtubeNotice.classList.remove('hidden');
+
+    if (is2dTheaterActive) refresh2dTheaterSlot();
 
     if (sync) {
         sendNetwork({
@@ -1527,9 +1534,74 @@ profileNameInput.addEventListener('keydown', e => {
 });
 
 // ==========================================
-// 14. UI INITIALIZATION & 500-SEAT MAP
+// 14. 2D THEATER SCREEN MODE CONTROLLER
+// ==========================================
+let is2dTheaterActive = false;
+
+function refresh2dTheaterSlot() {
+    const theater2dMediaSlot = document.getElementById('theater-2d-media-slot');
+    if (!theater2dMediaSlot || !is2dTheaterActive) return;
+
+    theater2dMediaSlot.innerHTML = '';
+
+    if (activeMediaMode === 'youtube') {
+        theater2dMediaSlot.appendChild(youtubeIframe);
+        youtubeIframe.style.width = '100%';
+        youtubeIframe.style.height = '100%';
+    } else if (activeMediaMode === 'video') {
+        videoElement.style.width = '100%';
+        videoElement.style.height = '100%';
+        videoElement.style.objectFit = 'contain';
+        videoElement.controls = true;
+        theater2dMediaSlot.appendChild(videoElement);
+    } else {
+        demoCanvas.style.width = '100%';
+        demoCanvas.style.height = '100%';
+        demoCanvas.style.objectFit = 'contain';
+        theater2dMediaSlot.appendChild(demoCanvas);
+    }
+}
+
+function open2dTheater() {
+    is2dTheaterActive = true;
+    const theater2dOverlay = document.getElementById('theater-2d-overlay');
+    if (theater2dOverlay) theater2dOverlay.classList.remove('hidden');
+    refresh2dTheaterSlot();
+}
+
+function close2dTheater() {
+    is2dTheaterActive = false;
+    const theater2dOverlay = document.getElementById('theater-2d-overlay');
+    const theater2dMediaSlot = document.getElementById('theater-2d-media-slot');
+    if (theater2dOverlay) theater2dOverlay.classList.add('hidden');
+
+    if (activeMediaMode === 'youtube') {
+        youtubeIframe.style.width = '1600px';
+        youtubeIframe.style.height = '706px';
+        if (ytWrapper) ytWrapper.appendChild(youtubeIframe);
+    } else if (activeMediaMode === 'video') {
+        videoElement.controls = false;
+        if (theater2dMediaSlot && theater2dMediaSlot.contains(videoElement)) {
+            theater2dMediaSlot.removeChild(videoElement);
+        }
+    } else {
+        if (theater2dMediaSlot && theater2dMediaSlot.contains(demoCanvas)) {
+            theater2dMediaSlot.removeChild(demoCanvas);
+        }
+    }
+}
+
+// ==========================================
+// 15. UI INITIALIZATION & 500-SEAT MAP
 // ==========================================
 function initUI() {
+    const btnOpenTheater2d = document.getElementById('btn-open-theater-2d');
+    const btnOpenTheater2dBottom = document.getElementById('btn-open-theater-2d-bottom');
+    const btnCloseTheater2d = document.getElementById('btn-close-theater-2d');
+
+    if (btnOpenTheater2d) btnOpenTheater2d.addEventListener('click', open2dTheater);
+    if (btnOpenTheater2dBottom) btnOpenTheater2dBottom.addEventListener('click', open2dTheater);
+    if (btnCloseTheater2d) btnCloseTheater2d.addEventListener('click', close2dTheater);
     const selectRow = document.getElementById('select-row');
     const selectCol = document.getElementById('select-col');
 
