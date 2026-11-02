@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rạp Chiếu Phim 3D IMAX - 500 Chỗ Ngồi</title>
+    <link rel="stylesheet" href="style.css" />
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <!-- 3D Viewport Containers -->
+    <div id="css3d-container"></div>
+    <div id="webgl-container"></div>
+
+    <!-- Seat Hover Tooltip -->
+    <div id="seat-tooltip" class="hidden">
+        <div class="tooltip-seat-id" id="tooltip-title">Ghế I13</div>
+        <div class="tooltip-seat-type" id="tooltip-subtitle">Hạng VIP • Chính giữa</div>
+        <div class="tooltip-hint">Nhấp chuột để ngồi vào ghế này</div>
+    </div>
+
+    <!-- Top Header Bar -->
+    <header class="top-bar glass-panel">
+        <div class="brand">
+            <span class="brand-badge">IMAX 3D</span>
+            <div>
+                <h1>Rạp Chiếu Phim Không Gian 3D</h1>
+                <p>Sức chứa: <strong>500 Ghế</strong> (20 Hàng A–T × 25 Ghế) • Màn hình 24m × 10m</p>
+            </div>
+        </div>
+
+        <div class="status-pills">
+            <div class="pill">
+                <span class="dot active"></span>
+                <span>Tổng số ghế: <strong>500</strong></span>
+            </div>
+            <div class="pill" id="current-seat-pill">
+                <span>Vị trí đang ngồi: <strong id="current-seat-label">Toàn cảnh (Tự do)</strong></span>
+            </div>
+        </div>
+
+        <div class="top-actions">
+            <button id="btn-open-seatmap" class="btn btn-secondary" title="Mở sơ đồ 500 ghế">
+                Sơ đồ 500 ghế
+            </button>
+            <button id="btn-toggle-lights" class="btn btn-secondary" title="Bật/Tắt đèn rạp">
+                Đèn rạp: Mờ
+            </button>
+            <button id="btn-toggle-ui" class="btn btn-icon" title="Ẩn/Hiện giao diện (Phím H)">
+                Ẩn UI
+            </button>
+        </div>
+    </header>
+
+    <!-- Left Quick Camera & Seat Navigation Panel -->
+    <aside class="side-panel glass-panel" id="side-panel">
+        <h3>Góc nhìn & Vị trí</h3>
+        <div class="preset-grid">
+            <button class="preset-btn active" data-preset="overview">Toàn cảnh rạp</button>
+            <button class="preset-btn" data-preset="stage">Từ sân khấu nhìn xuống</button>
+            <button class="preset-btn" data-seat="I13">Giữa rạp VIP (I13)</button>
+            <button class="preset-btn" data-seat="B13">Hàng gần màn hình (B13)</button>
+            <button class="preset-btn" data-seat="T13">Hàng cuối Sweetbox (T13)</button>
+            <button class="preset-btn" data-seat="K4">Cánh trái (K4)</button>
+            <button class="preset-btn" data-seat="K22">Cánh phải (K22)</button>
+        </div>
+
+        <hr class="divider" />
+
+        <h3>Chọn nhanh chỗ ngồi (500 ghế)</h3>
+        <div class="quick-seat-selector">
+            <div class="field-group">
+                <label for="select-row">Hàng ghế (A - T)</label>
+                <select id="select-row"></select>
+            </div>
+            <div class="field-group">
+                <label for="select-col">Số ghế (1 - 25)</label>
+                <select id="select-col"></select>
+            </div>
+        </div>
+        <button id="btn-go-seat" class="btn btn-primary full-width">Di chuyển tới ghế này</button>
+
+        <hr class="divider" />
+
+        <div class="legend-box">
+            <div class="legend-item">
+                <span class="swatch standard"></span>
+                <span>Ghế Thường (A–H): 200 ghế</span>
+            </div>
+            <div class="legend-item">
+                <span class="swatch vip"></span>
+                <span>Ghế VIP (I–R): 250 ghế</span>
+            </div>
+            <div class="legend-item">
+                <span class="swatch couple"></span>
+                <span>Ghế Đôi/Sweetbox (S–T): 50 ghế</span>
+            </div>
+            <div class="legend-item">
+                <span class="swatch current"></span>
+                <span>Ghế bạn đang ngồi</span>
+            </div>
+        </div>
+
+        <div class="controls-help">
+            <p><strong>Điều khiển chuột & phím:</strong></p>
+            <ul>
+                <li><strong>Click vào ghế 3D:</strong> Ngồi vào ghế đó</li>
+                <li><strong>Chuột trái + Kéo:</strong> Xoay góc nhìn</li>
+                <li><strong>Chuột phải + Kéo:</strong> Di chuyển camera</li>
+                <li><strong>Con lăn chuột:</strong> Phóng to / Thu nhỏ</li>
+                <li><strong>W, A, S, D:</strong> Di chuyển tự do trong rạp</li>
+            </ul>
+        </div>
+    </aside>
+
+    <!-- Bottom Video & Media Control Dock -->
+    <footer class="bottom-bar glass-panel" id="bottom-bar">
+        <div class="media-source-row">
+            <div class="source-group">
+                <label class="btn btn-upload" for="file-upload">
+                    Tải video từ máy (MP4/WebM)
+                </label>
+                <input type="file" id="file-upload" accept="video/*" hidden />
+            </div>
+
+            <div class="url-group">
+                <input
+                    type="text"
+                    id="video-url-input"
+                    placeholder="Dán link video MP4 hoặc link YouTube (VD: https://www.youtube.com/watch?v=...) rồi nhấn Chiếu..."
+                />
+                <button id="btn-load-url" class="btn btn-primary">Chiếu lên màn hình</button>
+            </div>
+
+            <div class="sample-group">
+                <select id="sample-video-select" title="Chọn phim mẫu có sẵn">
+                    <option value="trailer_canvas">Demo: Intro IMAX 3D (Tích hợp sẵn)</option>
+                    <option value="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4">Phim mẫu 1: Big Buck Bunny (HD MP4)</option>
+                    <option value="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4">Phim mẫu 2: Elephants Dream (Sci-Fi)</option>
+                    <option value="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4">Phim mẫu 3: Sintel (Fantasy Action)</option>
+                    <option value="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4">Phim mẫu 4: Tears of Steel (VFX)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="playback-row" id="playback-controls">
+            <button id="btn-play-pause" class="btn btn-control">Tạm dừng</button>
+            <span id="time-current" class="time-label">00:00</span>
+            <input type="range" id="seek-bar" min="0" max="100" value="0" step="0.1" />
+            <span id="time-duration" class="time-label">00:00</span>
+
+            <div class="volume-box">
+                <button id="btn-mute" class="btn btn-control">Âm thanh</button>
+                <input type="range" id="volume-bar" min="0" max="1" value="0.8" step="0.05" />
+            </div>
+        </div>
+        <div id="youtube-notice" class="youtube-notice hidden">
+            Đang chiếu video YouTube trên màn hình 3D • Bạn có thể bấm trực tiếp lên màn hình rạp để điều khiển trình phát YouTube hoặc đổi ghế ngồi.
+        </div>
+    </footer>
+
+    <!-- Floating Restore UI Button when UI is hidden -->
+    <button id="btn-restore-ui" class="btn btn-primary floating-restore hidden">
+        Hiện điều khiển (H)
+    </button>
+
+    <!-- 2D 500-Seat Map Modal -->
+    <div id="seatmap-modal" class="modal-backdrop hidden">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <div>
+                    <h2>Sơ Đồ 500 Chỗ Ngồi Trong Rạp</h2>
+                    <p>Chọn bất kỳ ghế nào để bay đến vị trí ngồi đó trong không gian 3D</p>
+                </div>
+                <button id="btn-close-seatmap" class="btn btn-icon">✕</button>
+            </div>
+
+            <div class="screen-indicator">
+                <div class="screen-arc">MÀN HÌNH CHIẾU PHIM IMAX (24m × 10m)</div>
+            </div>
+
+            <div class="seatmap-scroll">
+                <div id="seatmap-grid" class="seatmap-grid"></div>
+            </div>
+
+            <div class="modal-footer">
+                <div class="legend-inline">
+                    <span><i class="swatch standard"></i> Thường (A–H: 200 ghế)</span>
+                    <span><i class="swatch vip"></i> VIP (I–R: 250 ghế)</span>
+                    <span><i class="swatch couple"></i> Sweetbox (S–T: 50 ghế)</span>
+                    <span><i class="swatch current"></i> Đang ngồi</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
+
+        window.THREE = THREE;
+        window.OrbitControls = OrbitControls;
+        window.CSS3DRenderer = CSS3DRenderer;
+        window.CSS3DObject = CSS3DObject;
+
+        const script = document.createElement('script');
+        script.src = 'app.js';
+        document.body.appendChild(script);
+    </script>
+</body>
+</html>
