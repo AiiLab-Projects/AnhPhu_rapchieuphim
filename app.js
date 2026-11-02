@@ -66,9 +66,10 @@ css3dContainer.appendChild(cssRenderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
-controls.maxPolarAngle = Math.PI / 2 + 0.12;
-controls.minDistance = 0.3;
-controls.maxDistance = 55;
+controls.maxPolarAngle = Math.PI / 2 - 0.04; // Không bao giờ chúc xuống dưới mặt sàn
+controls.minPolarAngle = 0.15; // Không lộn ngược qua trần nhà
+controls.minDistance = 0.6;
+controls.maxDistance = 6.8; // Giới hạn khoảng cách bám theo nhân vật, không bị văng ra khỏi rạp
 controls.target.set(0, 5, 5);
 controls.update();
 
@@ -1062,6 +1063,8 @@ function sitDownLocalPlayer(seatId) {
     const lookTarget = eyePos.clone().add(dirToScreen.multiplyScalar(15));
     controls.target.copy(lookTarget);
     camera.position.set(eyePos.x, eyePos.y + 0.35, eyePos.z + 0.4);
+    controls.minDistance = 0.15;
+    controls.maxDistance = 1.2;
 }
 
 function standUpLocalPlayer() {
@@ -1079,6 +1082,8 @@ function standUpLocalPlayer() {
         localAvatar.group.position.set(localPlayerData.x, localPlayerData.y, localPlayerData.z);
     }
     localAvatar.setSittingPose(false);
+    controls.minDistance = 0.6;
+    controls.maxDistance = 6.8;
 
     sendNetwork({
         type: 'stand',
@@ -1549,14 +1554,20 @@ function initUI() {
     function toggleCameraMode() {
         if (cameraMode === '3rd_person') {
             cameraMode = '1st_person';
+            controls.minDistance = 0.05;
+            controls.maxDistance = 0.1;
             btnCameraMode.textContent = '📷 Góc nhìn: Tầm mắt (1st)';
         } else if (cameraMode === '1st_person') {
             cameraMode = 'overview';
+            controls.minDistance = 2.0;
+            controls.maxDistance = 28.0;
             btnCameraMode.textContent = '📷 Góc nhìn: Toàn cảnh rạp';
-            camera.position.set(0, 16, 27);
+            camera.position.set(0, 15.5, 26);
             controls.target.set(0, 6, -6);
         } else {
             cameraMode = '3rd_person';
+            controls.minDistance = 0.6;
+            controls.maxDistance = 6.8;
             btnCameraMode.textContent = '📷 Góc nhìn: Sau lưng (3rd)';
         }
     }
@@ -1879,7 +1890,16 @@ function animate(now) {
         // Update Camera Position based on mode
         if (cameraMode === '3rd_person') {
             const headPos = new THREE.Vector3(localPlayerData.x, localPlayerData.y + 1.25, localPlayerData.z);
-            const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+            let offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+            let dist = offset.length();
+            if (dist < 0.1 || !isFinite(dist)) {
+                offset.set(0, 0.9, 3.2);
+                dist = offset.length();
+            }
+            // Keep 3rd person camera distance tight and comfortable (0.6m to 6.5m)
+            dist = Math.max(0.6, Math.min(6.5, dist));
+            offset.normalize().multiplyScalar(dist);
+
             controls.target.copy(headPos);
             camera.position.copy(headPos).add(offset);
         } else if (cameraMode === '1st_person') {
@@ -1905,8 +1925,32 @@ function animate(now) {
     updateNametags();
 
     controls.update();
+    clampCameraWithinAuditorium();
     renderer.render(scene, camera);
     cssRenderer.render(cssScene, camera);
+}
+
+// ==========================================
+// ROOM BOUNDARY CAMERA COLLISION GUARD
+// ==========================================
+function clampCameraWithinAuditorium() {
+    const minX = -20.2;
+    const maxX = 20.2;
+    const minZ = -18.2;
+    const maxZ = 28.0;
+    const maxY = 17.2;
+
+    camera.position.x = Math.max(minX, Math.min(maxX, camera.position.x));
+    camera.position.z = Math.max(minZ, Math.min(maxZ, camera.position.z));
+    camera.position.y = Math.min(maxY, camera.position.y);
+
+    const floorY = getFloorElevationAt(camera.position.x, camera.position.z);
+    camera.position.y = Math.max(floorY + 0.35, camera.position.y);
+
+    // Keep controls target inside room bounds as well
+    controls.target.x = Math.max(minX + 0.5, Math.min(maxX - 0.5, controls.target.x));
+    controls.target.z = Math.max(minZ + 0.5, Math.min(maxZ - 0.5, controls.target.z));
+    controls.target.y = Math.max(0.8, Math.min(maxY - 0.5, controls.target.y));
 }
 
 requestAnimationFrame(animate);
