@@ -12,6 +12,9 @@ const COLS = 25; // 25 seats per row -> 20 * 25 = 500 seats
 const SCREEN_WIDTH = 34.0;
 const SCREEN_HEIGHT = 14.8;
 const SCREEN_POS = new THREE.Vector3(0, 10.4, -18.6);
+const DEFAULT_CAMERA_FOV = 55;
+const DEFAULT_MAX_POLAR_ANGLE = Math.PI / 2 - 0.04;
+const SEAT_CAMERA_LOOK_DISTANCE = 20;
 
 // State
 const seatsData = new Map(); // id -> seat metadata & meshes
@@ -20,6 +23,13 @@ let currentSeatId = null;
 let hoveredSeatId = null;
 let lightMode = 1; // 0: Tắt, 1: Mờ (Default), 2: Sáng
 let activeMediaMode = 'canvas'; // 'canvas' | 'video' | 'youtube'
+let youtubePlayer = null;
+let youtubeApiLoading = false;
+let youtubeVideoId = '';
+let pendingYouTubeState = null;
+let pendingVideoMetadataHandler = null;
+let videoControllerId = null;
+let applyingSyncedVideo = false;
 
 // Camera transition animation state
 let cameraAnim = null;
@@ -41,7 +51,7 @@ scene.fog = new THREE.FogExp2(0x050508, 0.007);
 const cssScene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(
-    55,
+    DEFAULT_CAMERA_FOV,
     window.innerWidth / window.innerHeight,
     0.1,
     160
@@ -67,7 +77,7 @@ css3dContainer.appendChild(cssRenderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
-controls.maxPolarAngle = Math.PI / 2 - 0.04; // Không bao giờ chúc xuống dưới mặt sàn
+controls.maxPolarAngle = DEFAULT_MAX_POLAR_ANGLE; // Không bao giờ chúc xuống dưới mặt sàn
 controls.minPolarAngle = 0.15; // Không lộn ngược qua trần nhà
 controls.minDistance = 0.6;
 controls.maxDistance = 6.8; // Giới hạn khoảng cách bám theo nhân vật, không bị văng ra khỏi rạp
@@ -254,6 +264,7 @@ const screenMaterial = new THREE.MeshBasicMaterial({
 });
 
 let screenMesh;
+let youtubeWrapper = null;
 let youtubeCssObject = null;
 let youtubeIframe = null;
 
@@ -310,20 +321,14 @@ function buildAuditorium() {
     hallGroup.add(screenMesh);
 
     // CSS3D YouTube Screen (High-definition 1600x706 matching giant aspect ratio)
-    const ytWrapper = document.createElement('div');
-    ytWrapper.style.width = '1600px';
-    ytWrapper.style.height = '706px';
-    ytWrapper.style.background = '#000';
+    youtubeWrapper = document.createElement('div');
+    youtubeWrapper.style.width = '1600px';
+    youtubeWrapper.style.height = '706px';
+    youtubeWrapper.style.background = '#000';
+    youtubeIframe = createYouTubeIframe();
+    youtubeWrapper.appendChild(youtubeIframe);
 
-    youtubeIframe = document.createElement('iframe');
-    youtubeIframe.style.width = '1600px';
-    youtubeIframe.style.height = '706px';
-    youtubeIframe.style.border = 'none';
-    youtubeIframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
-    youtubeIframe.allowFullscreen = true;
-    ytWrapper.appendChild(youtubeIframe);
-
-    youtubeCssObject = new CSS3DObject(ytWrapper);
+    youtubeCssObject = new CSS3DObject(youtubeWrapper);
     youtubeCssObject.position.copy(SCREEN_POS);
     youtubeCssObject.scale.set(SCREEN_WIDTH / 1600, SCREEN_HEIGHT / 706, 1);
     youtubeCssObject.visible = false;
@@ -414,6 +419,17 @@ function buildAuditorium() {
     }
 
     scene.add(hallGroup);
+}
+
+function createYouTubeIframe() {
+    const iframe = document.createElement('iframe');
+    iframe.id = 'youtube-player';
+    iframe.style.width = '1600px';
+    iframe.style.height = '706px';
+    iframe.style.border = 'none';
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+    iframe.allowFullscreen = true;
+    return iframe;
 }
 
 // ==========================================
@@ -862,8 +878,8 @@ function handleNetworkMessage(msg) {
 
             updateOnlineCount();
 
-            // Sync video if remote already playing
-            if (msg.videoState && msg.videoState.src) {
+            videoControllerId = msg.videoControllerId || null;
+            if (msg.videoState) {
                 applySyncedVideo(msg.videoState);
             }
             break;
@@ -951,8 +967,11 @@ function handleNetworkMessage(msg) {
         }
 
         case 'video_synced': {
+            videoControllerId = msg.videoControllerId || null;
             applySyncedVideo(msg.videoState);
-            addChatMessage('system', `${msg.byPlayer} vừa chuyển hoặc phát phim.`);
+            if (msg.action !== 'tick') {
+                addChatMessage('system', `${msg.byPlayer} vừa chuyển hoặc điều khiển phim.`);
+            }
             break;
         }
     }
@@ -1026,6 +1045,74 @@ function broadcastLocalMovement() {
 const interactionHud = document.getElementById('interaction-hud');
 const interactionText = document.getElementById('interaction-text');
 
+function syncLocalAvatarVisibility() {
+    if (!localAvatar) return;
+
+    const shouldHideForSeatView = !!currentSeatId && (cameraMode === '3rd_person' || cameraMode === '1st_person');
+
+    localAvatar.group.visible = !shouldHideForSeatView;
+    if (cameraMode === 'overview') {
+        localAvatar.group.visible = true;
+    }
+
+    if (localAvatar.group.visible) {
+        const dist = camera.position.distanceTo(controls.target);
+        localAvatar.headGroup.visible = cameraMode !== 'overview' ? dist > 1.2 : true;
+    } else {
+        localAvatar.headGroup.visible = false;
+    }
+}
+
+function lockSeatCamera(seat) {
+    if (!seat) return;
+
+    const eyePos = seat.eyePosition.clone();
+    camera.position.set(eyePos.x, eyePos.y + 0.12, eyePos.z - 0.06);
+
+    const dirToScreen = new THREE.Vector3().subVectors(SCREEN_POS, camera.position).normalize();
+    const lookTarget = camera.position.clone().add(dirToScreen.multiplyScalar(SEAT_CAMERA_LOOK_DISTANCE));
+    controls.target.copy(lookTarget);
+
+    controls.enableRotate = false;
+    controls.enablePan = false;
+    controls.enableZoom = false;
+    controls.enableDamping = false;
+    controls.maxPolarAngle = Math.PI - 0.04;
+    controls.minDistance = SEAT_CAMERA_LOOK_DISTANCE;
+    controls.maxDistance = SEAT_CAMERA_LOOK_DISTANCE;
+    controls.update();
+
+    camera.updateMatrixWorld(true);
+    camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+    const screenCorners = [
+        [-SCREEN_WIDTH / 2, -SCREEN_HEIGHT / 2],
+        [-SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2],
+        [SCREEN_WIDTH / 2, -SCREEN_HEIGHT / 2],
+        [SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2]
+    ];
+    let requiredHalfFovTangent = 0;
+    screenCorners.forEach(([x, y]) => {
+        const corner = new THREE.Vector3(
+            SCREEN_POS.x + x,
+            SCREEN_POS.y + y,
+            SCREEN_POS.z
+        ).applyMatrix4(camera.matrixWorldInverse);
+        const depth = Math.max(0.1, -corner.z);
+        requiredHalfFovTangent = Math.max(
+            requiredHalfFovTangent,
+            Math.abs(corner.y) / depth,
+            Math.abs(corner.x) / (depth * camera.aspect)
+        );
+    });
+    camera.fov = THREE.MathUtils.clamp(
+        THREE.MathUtils.radToDeg(2 * Math.atan(requiredHalfFovTangent * 1.08)),
+        DEFAULT_CAMERA_FOV,
+        100
+    );
+    camera.updateProjectionMatrix();
+    lastFollowPos = null;
+}
+
 function sitDownLocalPlayer(seatId) {
     const seat = seatsData.get(seatId);
     if (!seat || !localAvatar) return;
@@ -1034,7 +1121,6 @@ function sitDownLocalPlayer(seatId) {
     localPlayerData.seatId = seatId;
     localPlayerData.state = 'sitting';
 
-    // Position avatar seated squarely on the chair
     localPlayerData.x = seat.sitPosition.x;
     localPlayerData.y = seat.sitPosition.y;
     localPlayerData.z = seat.sitPosition.z;
@@ -1043,7 +1129,7 @@ function sitDownLocalPlayer(seatId) {
     localAvatar.group.position.copy(seat.sitPosition);
     localAvatar.group.rotation.y = seat.yaw;
     localAvatar.setSittingPose(true);
-    localAvatar.group.visible = false; // Ẩn avatar của chính mình khi ngồi để tầm nhìn xem phim 100% không bị che
+    syncLocalAvatarVisibility();
 
     sendNetwork({
         type: 'sit',
@@ -1059,15 +1145,7 @@ function sitDownLocalPlayer(seatId) {
     interactionHud.classList.remove('hidden');
     interactionText.textContent = `Đứng dậy khỏi ghế ${seatId} (Phím E)`;
 
-    // Camera đặt ngang tầm mắt xem phim trực diện lên màn hình IMAX, không bị lưng ghế che
-    const eyePos = seat.eyePosition.clone();
-    camera.position.set(eyePos.x, eyePos.y + 0.1, eyePos.z - 0.05);
-    const dirToScreen = new THREE.Vector3().subVectors(SCREEN_POS, camera.position).normalize();
-    const lookTarget = camera.position.clone().add(dirToScreen.multiplyScalar(20));
-    controls.target.copy(lookTarget);
-    controls.minDistance = 0.05;
-    controls.maxDistance = 1.0;
-    lastFollowPos = null;
+    lockSeatCamera(seat);
 }
 
 function standUpLocalPlayer() {
@@ -1078,17 +1156,23 @@ function standUpLocalPlayer() {
     localPlayerData.seatId = null;
     localPlayerData.state = 'standing';
 
-    // Step just in front of the seat
     if (seat) {
         localPlayerData.z -= 0.65;
         localPlayerData.y = getFloorElevationAt(localPlayerData.x, localPlayerData.z);
         localAvatar.group.position.set(localPlayerData.x, localPlayerData.y, localPlayerData.z);
     }
     localAvatar.setSittingPose(false);
-    localAvatar.group.visible = true;
-    localAvatar.headGroup.visible = true;
+    syncLocalAvatarVisibility();
+
+    controls.enableRotate = true;
+    controls.enablePan = true;
+    controls.enableZoom = true;
+    controls.enableDamping = true;
+    controls.maxPolarAngle = DEFAULT_MAX_POLAR_ANGLE;
     controls.minDistance = 0.6;
     controls.maxDistance = 6.8;
+    camera.fov = DEFAULT_CAMERA_FOV;
+    camera.updateProjectionMatrix();
     lastFollowPos = null;
 
     sendNetwork({
@@ -1229,7 +1313,161 @@ function extractYouTubeId(url) {
     return match && match[1].length === 11 ? match[1] : null;
 }
 
+function getCurrentMediaTime() {
+    if (activeMediaMode === 'video') {
+        return Number.isFinite(videoElement.currentTime) ? videoElement.currentTime : 0;
+    }
+    if (activeMediaMode === 'youtube' && youtubePlayerReady && youtubePlayer) {
+        return youtubePlayer.getCurrentTime() || 0;
+    }
+    return 0;
+}
+
+function sendVideoSync(action, overrides = {}) {
+    if (applyingSyncedVideo) return;
+    const src = activeMediaMode === 'video' ? videoElement.src
+        : activeMediaMode === 'youtube' ? youtubeVideoId
+            : '';
+    if (src.startsWith('blob:')) return;
+
+    if (action !== 'tick') videoControllerId = localPlayerId;
+    sendNetwork({
+        type: 'sync_video',
+        action,
+        mode: activeMediaMode,
+        src,
+        title: activeMediaMode === 'youtube' ? 'YouTube' : activeMediaMode === 'canvas' ? 'Intro IMAX 3D' : 'Video',
+        currentTime: overrides.currentTime ?? getCurrentMediaTime(),
+        isPlaying: overrides.isPlaying ?? (
+            activeMediaMode === 'video' ? !videoElement.paused
+                : activeMediaMode === 'youtube' && youtubePlayerReady && youtubePlayer
+                    ? youtubePlayer.getPlayerState() === window.YT?.PlayerState.PLAYING
+                    : true
+        )
+    });
+}
+
+function applyDirectVideoState(state, currentTime, action) {
+    let requestedSrc;
+    try {
+        requestedSrc = new URL(state.src, window.location.href).href;
+    } catch {
+        addChatMessage('system', 'Không thể đồng bộ video: link video không hợp lệ.');
+        return;
+    }
+    const currentSrc = videoElement.src;
+    const isNewSource = activeMediaMode !== 'video' || currentSrc !== requestedSrc || action === 'load';
+    if (isNewSource) {
+        loadDirectVideo(state.src, false, currentTime, state.isPlaying);
+        return;
+    }
+
+    if (Math.abs(videoElement.currentTime - currentTime) > 1.25) {
+        videoElement.currentTime = currentTime;
+    }
+    if (state.isPlaying && videoElement.paused) {
+        videoElement.play().then(() => {
+            btnPlayPause.textContent = 'Tạm dừng';
+        }).catch(() => {
+            btnPlayPause.textContent = 'Phát phim';
+        });
+    } else if (!state.isPlaying && !videoElement.paused) {
+        videoElement.pause();
+    }
+    btnPlayPause.textContent = state.isPlaying ? 'Tạm dừng' : 'Phát phim';
+}
+
+function applyYouTubeState(state, currentTime, action) {
+    const isNewVideo = youtubeVideoId !== state.src || action === 'load';
+    youtubeVideoId = state.src;
+    pendingYouTubeState = {
+        videoId: state.src,
+        currentTime,
+        isPlaying: state.isPlaying,
+        load: isNewVideo || (!youtubePlayerReady && pendingYouTubeState?.load)
+    };
+
+    if (isNewVideo && !youtubePlayer) {
+        youtubeIframe.src = `https://www.youtube.com/embed/${encodeURIComponent(state.src)}?enablejsapi=1&controls=0&autoplay=1&rel=0&modestbranding=1&origin=${encodeURIComponent(window.location.origin)}`;
+    }
+    ensureYouTubePlayer();
+    if (youtubePlayer && youtubePlayerReady) {
+        applyPendingYouTubeState();
+    }
+}
+
+let youtubePlayerReady = false;
+function ensureYouTubePlayer() {
+    if (window.YT && window.YT.Player) {
+        if (!youtubePlayer) {
+            youtubePlayer = new window.YT.Player(youtubeIframe, {
+                events: {
+                    onReady: () => {
+                        youtubePlayerReady = true;
+                        applyPendingYouTubeState();
+                    },
+                    onError: event => {
+                        console.error('YouTube player error:', event.data);
+                    }
+                }
+            });
+        }
+        return;
+    }
+    if (youtubeApiLoading) return;
+
+    youtubeApiLoading = true;
+    window.onYouTubeIframeAPIReady = () => {
+        youtubeApiLoading = false;
+        ensureYouTubePlayer();
+    };
+    const script = document.createElement('script');
+    script.src = 'https://www.youtube.com/iframe_api';
+    script.onerror = () => {
+        youtubeApiLoading = false;
+        addChatMessage('system', 'Không tải được YouTube Player API. Hãy thử tải lại trang.');
+    };
+    document.head.appendChild(script);
+}
+
+function resetYouTubePlayer() {
+    if (youtubePlayer) youtubePlayer.destroy();
+    youtubePlayer = null;
+    youtubePlayerReady = false;
+    youtubeVideoId = '';
+    pendingYouTubeState = null;
+    if (!youtubeIframe.isConnected) {
+        youtubeIframe = createYouTubeIframe();
+        youtubeWrapper.appendChild(youtubeIframe);
+    } else {
+        youtubeIframe.src = 'about:blank';
+    }
+}
+
+function applyPendingYouTubeState() {
+    if (!youtubePlayerReady || !youtubePlayer || !pendingYouTubeState) return;
+
+    const state = pendingYouTubeState;
+    pendingYouTubeState = null;
+    if (state.load) {
+        if (state.isPlaying) {
+            youtubePlayer.loadVideoById({ videoId: state.videoId, startSeconds: state.currentTime });
+        } else {
+            youtubePlayer.cueVideoById({ videoId: state.videoId, startSeconds: state.currentTime });
+        }
+    } else {
+        const currentTime = youtubePlayer.getCurrentTime() || 0;
+        if (Math.abs(currentTime - state.currentTime) > 1.25) {
+            youtubePlayer.seekTo(state.currentTime, true);
+        }
+        if (state.isPlaying) youtubePlayer.playVideo();
+        else youtubePlayer.pauseVideo();
+    }
+    btnPlayPause.textContent = state.isPlaying ? 'Tạm dừng' : 'Phát phim';
+}
+
 function switchToCanvasDemo(sync = true) {
+    if (activeMediaMode === 'youtube') resetYouTubePlayer();
     activeMediaMode = 'canvas';
     videoElement.pause();
     youtubeIframe.src = 'about:blank';
@@ -1243,32 +1481,45 @@ function switchToCanvasDemo(sync = true) {
     btnPlayPause.textContent = 'Đang chạy Demo';
 
     if (sync) {
-        sendNetwork({
-            type: 'sync_video',
-            mode: 'canvas',
-            src: '',
-            title: 'Intro IMAX 3D'
-        });
+        sendVideoSync('load');
     }
 }
 
-function loadDirectVideo(srcUrl, sync = true, startTime = 0) {
+function loadDirectVideo(srcUrl, sync = true, startTime = 0, isPlaying = true) {
+    if (activeMediaMode === 'youtube') resetYouTubePlayer();
     activeMediaMode = 'video';
     youtubeIframe.src = 'about:blank';
     youtubeCssObject.visible = false;
     css3dContainer.classList.remove('youtube-active');
     screenMesh.visible = true;
 
-    videoElement.src = srcUrl;
-    videoElement.load();
-    if (startTime > 0) {
-        videoElement.currentTime = startTime;
+    videoElement.pause();
+    if (pendingVideoMetadataHandler) {
+        videoElement.removeEventListener('loadedmetadata', pendingVideoMetadataHandler);
     }
-    videoElement.play().then(() => {
-        btnPlayPause.textContent = 'Tạm dừng';
-    }).catch(() => {
-        btnPlayPause.textContent = 'Phát phim';
-    });
+    videoElement.removeAttribute('src');
+    videoElement.src = srcUrl;
+    const startPlayback = () => {
+        videoElement.removeEventListener('loadedmetadata', startPlayback);
+        pendingVideoMetadataHandler = null;
+        if (videoElement.duration && Number.isFinite(videoElement.duration)) {
+            videoElement.currentTime = Math.min(startTime, Math.max(0, videoElement.duration - 0.1));
+        } else if (startTime > 0) {
+            videoElement.currentTime = startTime;
+        }
+        if (isPlaying) {
+            videoElement.play().then(() => {
+                btnPlayPause.textContent = 'Tạm dừng';
+            }).catch(() => {
+                btnPlayPause.textContent = 'Phát phim';
+            });
+        } else {
+            btnPlayPause.textContent = 'Phát phim';
+        }
+    };
+    pendingVideoMetadataHandler = startPlayback;
+    videoElement.addEventListener('loadedmetadata', startPlayback);
+    videoElement.load();
 
     screenMaterial.map = videoTexture;
     screenMaterial.needsUpdate = true;
@@ -1276,55 +1527,69 @@ function loadDirectVideo(srcUrl, sync = true, startTime = 0) {
     youtubeNotice.classList.add('hidden');
 
     if (sync) {
-        sendNetwork({
-            type: 'sync_video',
-            mode: 'video',
-            src: srcUrl,
-            currentTime: startTime,
-            isPlaying: true
-        });
+        sendVideoSync('load', { currentTime: startTime, isPlaying });
     }
 }
 
-function loadYouTubeVideo(videoId, sync = true) {
+function loadYouTubeVideo(videoId, sync = true, startTime = 0, isPlaying = true) {
     activeMediaMode = 'youtube';
     videoElement.pause();
 
-    youtubeIframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`;
+    youtubeVideoId = videoId;
+    pendingYouTubeState = { videoId, currentTime: startTime, isPlaying, load: true };
+    if (!youtubePlayer) {
+        youtubeIframe.src = `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?enablejsapi=1&controls=0&autoplay=1&rel=0&modestbranding=1&origin=${encodeURIComponent(window.location.origin)}`;
+    }
     youtubeCssObject.visible = true;
     css3dContainer.classList.add('youtube-active');
-    playbackControls.classList.add('hidden');
+    playbackControls.classList.remove('hidden');
     youtubeNotice.classList.remove('hidden');
+    ensureYouTubePlayer();
+    if (youtubePlayer && youtubePlayerReady) applyPendingYouTubeState();
 
     if (sync) {
-        sendNetwork({
-            type: 'sync_video',
-            mode: 'youtube',
-            src: videoId,
-            isPlaying: true
-        });
+        sendVideoSync('load', { currentTime: startTime, isPlaying });
     }
 }
 
-function applySyncedVideo(state) {
+function applySyncedVideo(state, action = 'load') {
+    applyingSyncedVideo = true;
+    const elapsed = state.isPlaying && (state.mode === 'video' || state.mode === 'youtube')
+        ? Math.max(0, (Date.now() - (state.lastUpdateTimestamp || Date.now())) / 1000)
+        : 0;
+    const currentTime = Math.max(0, (Number(state.currentTime) || 0) + elapsed);
     if (state.mode === 'canvas') {
         switchToCanvasDemo(false);
     } else if (state.mode === 'youtube') {
-        loadYouTubeVideo(state.src, false);
+        activeMediaMode = 'youtube';
+        videoElement.pause();
+        youtubeCssObject.visible = true;
+        css3dContainer.classList.add('youtube-active');
+        playbackControls.classList.remove('hidden');
+        youtubeNotice.classList.remove('hidden');
+        applyYouTubeState(state, currentTime, action);
     } else if (state.mode === 'video') {
-        loadDirectVideo(state.src, false, state.currentTime || 0);
-        if (!state.isPlaying) {
-            videoElement.pause();
-            btnPlayPause.textContent = 'Phát phim';
-        }
+        if (activeMediaMode === 'youtube') resetYouTubePlayer();
+        activeMediaMode = 'video';
+        youtubeIframe.src = 'about:blank';
+        youtubeCssObject.visible = false;
+        css3dContainer.classList.remove('youtube-active');
+        screenMesh.visible = true;
+        screenMaterial.map = videoTexture;
+        screenMaterial.needsUpdate = true;
+        playbackControls.classList.remove('hidden');
+        youtubeNotice.classList.add('hidden');
+        applyDirectVideoState(state, currentTime, action);
     }
+    applyingSyncedVideo = false;
 }
 
 document.getElementById('file-upload').addEventListener('change', e => {
     const file = e.target.files[0];
     if (!file) return;
     const fileUrl = URL.createObjectURL(file);
-    loadDirectVideo(fileUrl, true);
+    loadDirectVideo(fileUrl, false);
+    addChatMessage('system', 'Video từ máy bạn chỉ phát được ở máy này. Muốn mọi người xem cùng, hãy dùng link video công khai hoặc chọn phim mẫu.');
     if (lightMode === 2) applyLightMode(1);
 });
 
@@ -1336,7 +1601,18 @@ function handleUrlSubmit() {
     if (ytId) {
         loadYouTubeVideo(ytId, true);
     } else {
-        loadDirectVideo(rawUrl, true);
+        let videoUrl;
+        try {
+            videoUrl = new URL(rawUrl);
+        } catch {
+            addChatMessage('system', 'Link video không hợp lệ. Hãy nhập URL MP4/WebM công khai hoặc link YouTube.');
+            return;
+        }
+        if (!['http:', 'https:'].includes(videoUrl.protocol)) {
+            addChatMessage('system', 'Link video phải dùng HTTP hoặc HTTPS để mọi người trong phòng truy cập được.');
+            return;
+        }
+        loadDirectVideo(videoUrl.href, true);
     }
 }
 
@@ -1361,26 +1637,25 @@ btnPlayPause.addEventListener('click', () => {
         loadDirectVideo(sampleSelect.value, true);
         return;
     }
-    if (videoElement.paused) {
-        videoElement.play();
-        btnPlayPause.textContent = 'Tạm dừng';
-        sendNetwork({
-            type: 'sync_video',
-            mode: 'video',
-            src: videoElement.src,
-            currentTime: videoElement.currentTime,
-            isPlaying: true
+    if (activeMediaMode === 'youtube') {
+        const isPlaying = youtubePlayerReady && youtubePlayer
+            && youtubePlayer.getPlayerState() === window.YT.PlayerState.PLAYING;
+        if (isPlaying) youtubePlayer.pauseVideo();
+        else if (youtubePlayerReady && youtubePlayer) youtubePlayer.playVideo();
+        const nextIsPlaying = !isPlaying;
+        btnPlayPause.textContent = nextIsPlaying ? 'Tạm dừng' : 'Phát phim';
+        sendVideoSync(nextIsPlaying ? 'play' : 'pause', { isPlaying: nextIsPlaying });
+    } else if (videoElement.paused) {
+        videoElement.play().then(() => {
+            btnPlayPause.textContent = 'Tạm dừng';
+        }).catch(() => {
+            btnPlayPause.textContent = 'Phát phim';
         });
+        sendVideoSync('play', { isPlaying: true });
     } else {
         videoElement.pause();
         btnPlayPause.textContent = 'Phát phim';
-        sendNetwork({
-            type: 'sync_video',
-            mode: 'video',
-            src: videoElement.src,
-            currentTime: videoElement.currentTime,
-            isPlaying: false
-        });
+        sendVideoSync('pause', { isPlaying: false });
     }
 });
 
@@ -1395,25 +1670,56 @@ videoElement.addEventListener('timeupdate', () => {
 seekBar.addEventListener('input', () => {
     if (activeMediaMode === 'video' && videoElement.duration) {
         videoElement.currentTime = (seekBar.value / 100) * videoElement.duration;
-        sendNetwork({
-            type: 'sync_video',
-            mode: 'video',
-            src: videoElement.src,
-            currentTime: videoElement.currentTime,
-            isPlaying: !videoElement.paused
-        });
+    } else if (activeMediaMode === 'youtube' && youtubePlayerReady && youtubePlayer && youtubePlayer.getDuration()) {
+        const currentTime = (seekBar.value / 100) * youtubePlayer.getDuration();
+        youtubePlayer.seekTo(currentTime, true);
     }
 });
 
+seekBar.addEventListener('change', () => {
+    if (activeMediaMode === 'video' || activeMediaMode === 'youtube') {
+        sendVideoSync('seek', { currentTime: getCurrentMediaTime() });
+    }
+});
+
+setInterval(() => {
+    if (activeMediaMode === 'youtube' && youtubePlayerReady && youtubePlayer) {
+        const duration = youtubePlayer.getDuration() || 0;
+        const currentTime = youtubePlayer.getCurrentTime() || 0;
+        if (duration > 0) {
+            seekBar.value = (currentTime / duration) * 100;
+            timeCurrent.textContent = formatTime(currentTime);
+            timeDuration.textContent = formatTime(duration);
+        }
+    }
+    if (localPlayerId && videoControllerId === localPlayerId && activeMediaMode !== 'canvas') {
+        sendVideoSync('tick');
+    }
+}, 2000);
+
 btnMute.addEventListener('click', () => {
-    videoElement.muted = !videoElement.muted;
-    btnMute.textContent = videoElement.muted ? 'Đã tắt tiếng' : 'Âm thanh';
+    if (activeMediaMode === 'youtube' && youtubePlayerReady && youtubePlayer) {
+        if (youtubePlayer.isMuted()) youtubePlayer.unMute();
+        else youtubePlayer.mute();
+        btnMute.textContent = youtubePlayer.isMuted() ? 'Đã tắt tiếng' : 'Âm thanh';
+    } else {
+        videoElement.muted = !videoElement.muted;
+        btnMute.textContent = videoElement.muted ? 'Đã tắt tiếng' : 'Âm thanh';
+    }
 });
 
 volumeBar.addEventListener('input', () => {
-    videoElement.volume = parseFloat(volumeBar.value);
-    videoElement.muted = videoElement.volume === 0;
-    btnMute.textContent = videoElement.muted ? 'Đã tắt tiếng' : 'Âm thanh';
+    const volume = parseFloat(volumeBar.value);
+    if (activeMediaMode === 'youtube' && youtubePlayerReady && youtubePlayer) {
+        youtubePlayer.setVolume(volume * 100);
+        if (volume === 0) youtubePlayer.mute();
+        else youtubePlayer.unMute();
+        btnMute.textContent = volume === 0 ? 'Đã tắt tiếng' : 'Âm thanh';
+    } else {
+        videoElement.volume = volume;
+        videoElement.muted = volume === 0;
+        btnMute.textContent = videoElement.muted ? 'Đã tắt tiếng' : 'Âm thanh';
+    }
 });
 
 // ==========================================
@@ -1558,6 +1864,8 @@ function initUI() {
     // Camera Mode toggle (3rd person / 1st person / Overview)
     const btnCameraMode = document.getElementById('btn-camera-mode');
     function toggleCameraMode() {
+        if (currentSeatId) return;
+
         lastFollowPos = null;
         if (cameraMode === '3rd_person') {
             cameraMode = '1st_person';
@@ -1838,6 +2146,13 @@ function animate(now) {
     const keys = window.__keysPressed || {};
     let isMoving = false;
 
+    if (currentSeatId) {
+        const seat = seatsData.get(currentSeatId);
+        if (seat) {
+            lockSeatCamera(seat);
+        }
+    }
+
     if (localAvatar && !currentSeatId) {
         const moveVec = new THREE.Vector3();
 
@@ -1911,24 +2226,15 @@ function animate(now) {
             controls.target.add(deltaMove);
             camera.position.add(deltaMove);
             lastFollowPos.copy(headPos);
-
-            if (currentSeatId) {
-                localAvatar.group.visible = false;
-            } else {
-                localAvatar.group.visible = true;
-                const dist = camera.position.distanceTo(controls.target);
-                localAvatar.headGroup.visible = (dist > 1.2);
-            }
         } else if (cameraMode === '1st_person') {
             const eyePos = new THREE.Vector3(localPlayerData.x, localPlayerData.y + 1.45, localPlayerData.z);
             camera.position.copy(eyePos);
-            localAvatar.group.visible = false;
             if (lastFollowPos) lastFollowPos.copy(eyePos);
         } else {
-            localAvatar.group.visible = true;
-            localAvatar.headGroup.visible = true;
             lastFollowPos = null;
         }
+
+        syncLocalAvatarVisibility();
     }
 
     // 3. Interpolate Remote Players

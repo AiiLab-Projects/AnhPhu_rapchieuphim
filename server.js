@@ -27,6 +27,20 @@ let cinemaVideoState = {
     isPlaying: true,
     lastUpdateTimestamp: Date.now()
 };
+let videoControllerId = null;
+
+function getCurrentVideoState() {
+    const now = Date.now();
+    const currentTime = cinemaVideoState.isPlaying && (cinemaVideoState.mode === 'video' || cinemaVideoState.mode === 'youtube')
+        ? cinemaVideoState.currentTime + (now - cinemaVideoState.lastUpdateTimestamp) / 1000
+        : cinemaVideoState.currentTime;
+
+    return {
+        ...cinemaVideoState,
+        currentTime,
+        lastUpdateTimestamp: now
+    };
+}
 
 const AVATAR_COLORS = [
     '#ef4444', '#f97316', '#f59e0b', '#10b981',
@@ -62,6 +76,7 @@ wss.on('connection', ws => {
     ws.on('pong', () => { ws.isAlive = true; });
 
     const playerId = 'player_' + Math.random().toString(36).substr(2, 9);
+    ws.playerId = playerId;
     const playerNum = nextPlayerNumber++;
     const defaultColor = AVATAR_COLORS[(playerNum - 1) % AVATAR_COLORS.length];
 
@@ -81,19 +96,13 @@ wss.on('connection', ws => {
     players.set(playerId, newPlayer);
 
     // Send Welcome payload with current world state to new player
-    const currentVideoTime = cinemaVideoState.isPlaying && cinemaVideoState.mode === 'video'
-        ? cinemaVideoState.currentTime + (Date.now() - cinemaVideoState.lastUpdateTimestamp) / 1000
-        : cinemaVideoState.currentTime;
-
     ws.send(JSON.stringify({
         type: 'welcome',
         playerId: playerId,
         playerData: newPlayer,
         allPlayers: Array.from(players.values()),
-        videoState: {
-            ...cinemaVideoState,
-            currentTime: currentVideoTime
-        }
+        videoState: getCurrentVideoState(),
+        videoControllerId
     }));
 
     // Broadcast new player to all existing clients
@@ -205,20 +214,28 @@ wss.on('connection', ws => {
                 }
 
                 case 'sync_video': {
+                    const mode = ['canvas', 'video', 'youtube'].includes(data.mode) ? data.mode : 'video';
+                    const action = ['load', 'play', 'pause', 'seek', 'tick'].includes(data.action) ? data.action : 'load';
+                    if (action === 'tick' && playerId !== videoControllerId) break;
+
+                    const currentTime = Number(data.currentTime);
+                    if (action !== 'tick') videoControllerId = playerId;
                     cinemaVideoState = {
-                        mode: data.mode || 'video',
-                        src: data.src || '',
-                        title: data.title || 'Video',
-                        currentTime: data.currentTime || 0,
-                        isPlaying: data.isPlaying !== undefined ? data.isPlaying : true,
+                        mode,
+                        src: typeof data.src === 'string' ? data.src.substring(0, 2048) : '',
+                        title: typeof data.title === 'string' ? data.title.substring(0, 120) : 'Video',
+                        currentTime: Number.isFinite(currentTime) ? Math.max(0, currentTime) : 0,
+                        isPlaying: typeof data.isPlaying === 'boolean' ? data.isPlaying : action !== 'pause',
                         lastUpdateTimestamp: Date.now()
                     };
 
                     broadcast({
                         type: 'video_synced',
                         videoState: cinemaVideoState,
-                        byPlayer: p.name
-                    });
+                        action,
+                        byPlayer: p.name,
+                        videoControllerId
+                    }, ws);
                     break;
                 }
             }
@@ -233,6 +250,18 @@ wss.on('connection', ws => {
             type: 'player_left',
             playerId: playerId
         });
+        if (videoControllerId === playerId) {
+            cinemaVideoState = getCurrentVideoState();
+            const nextController = Array.from(wss.clients).find(client => client.readyState === WebSocket.OPEN);
+            videoControllerId = nextController ? nextController.playerId : null;
+            broadcast({
+                type: 'video_synced',
+                videoState: cinemaVideoState,
+                action: 'tick',
+                byPlayer: 'Hệ thống',
+                videoControllerId
+            });
+        }
     });
 });
 

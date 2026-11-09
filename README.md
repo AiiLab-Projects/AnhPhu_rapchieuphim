@@ -29,12 +29,13 @@ Dự án rạp chiếu phim 3D tương tác thời gian thực trên nền tản
 - Đồng bộ chuyển động của nhiều người chơi trong phòng thông qua WebSocket thời gian thực.
 - Bảng tên và bong bóng trò chuyện (Chat Speech Bubble) nổi 3D ngay trên đầu nhân vật.
 - Khung trò chuyện tích hợp cùng bộ biểu cảm tương tác nhanh (🍿, 👏, ❤️, 😂, 🎬, 🥤).
-- Đồng bộ trạng thái phát phim: Khi bất kỳ ai đổi phim, tạm dừng hoặc phát, màn hình lớn của mọi người sẽ đồng bộ theo.
+- Đồng bộ video theo thời gian thực: Chọn phim, phát/tạm dừng và tua sẽ cập nhật cho cả phòng; người mới vào được đưa tới đúng thời điểm đang xem.
 
 ### 4. Màn Hình Chiếu IMAX 24m × 10m Đa Phương Tiện
-- Phát video trực tiếp từ máy tính (`MP4`, `WebM`).
+- Phát video MP4/WebM từ URL công khai mà các thiết bị trong phòng đều truy cập được.
 - Hỗ trợ dán link video trực tuyến hoặc link **YouTube** phát thẳng trên màn hình 3D.
 - Tích hợp sẵn 4 phim mẫu độ phân giải cao cùng intro IMAX 3D Canvas động.
+- Video tải từ máy chỉ phát trên máy đã tải lên; muốn xem cùng nhau, hãy dùng link video công khai hoặc phim mẫu.
 
 ---
 
