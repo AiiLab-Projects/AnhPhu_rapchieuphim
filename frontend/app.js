@@ -1653,7 +1653,8 @@ async function handleUrlSubmit() {
         } catch (err) {
             console.warn('YouTube stream extraction failed:', err);
         }
-        addChatMessage('system', 'Không thể lấy luồng video không quảng cáo cho link YouTube này. Đã chặn phát nhúng YouTube để tránh quảng cáo.');
+        addChatMessage('system', 'Không lấy được luồng trực tiếp, chuyển sang phát bằng trình nhúng YouTube (có thể có quảng cáo).');
+        loadYouTubeVideo(ytId, true);
     } else {
         let videoUrl;
         try {
