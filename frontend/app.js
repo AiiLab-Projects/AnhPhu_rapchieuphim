@@ -843,9 +843,30 @@ function initWebSocket() {
     };
 }
 
+function closeWebSocketOnLeave() {
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        ws.onclose = null;
+        ws.close(1000, 'Page unload');
+    }
+}
+window.addEventListener('pagehide', closeWebSocketOnLeave);
+window.addEventListener('beforeunload', closeWebSocketOnLeave);
+
 function handleNetworkMessage(msg) {
     switch (msg.type) {
         case 'welcome': {
+            // Clear any stale state from a previous connection before re-syncing
+            Array.from(remotePlayers.keys()).forEach(id => removeRemotePlayer(id));
+            if (localAvatar && localAvatar.group) {
+                scene.remove(localAvatar.group);
+            }
+            if (localPlayerId) {
+                const oldLocalTag = document.getElementById(`nametag-${localPlayerId}`);
+                if (oldLocalTag && oldLocalTag.parentNode) {
+                    oldLocalTag.parentNode.removeChild(oldLocalTag);
+                }
+            }
+
             localPlayerId = msg.playerId;
             localPlayerData = msg.playerData;
 
