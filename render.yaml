@@ -3,6 +3,6 @@ services:
     name: rapchieuphim-backend
     runtime: node
     rootDir: backend
-    buildCommand: npm install
+    buildCommand: npm install && mkdir -p bin && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o bin/yt-dlp && chmod +x bin/yt-dlp
     startCommand: npm start
     healthCheckPath: /health

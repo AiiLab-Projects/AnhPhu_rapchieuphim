@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const path = require('path');
+const fs = require('fs');
 const { execFile } = require('child_process');
 const WebSocket = require('ws');
 
@@ -27,9 +28,11 @@ app.get('/api/youtube-stream', (req, res) => {
         return res.json({ url: cached.url, cached: true });
     }
 
+    const localYtDlp = path.join(__dirname, 'bin', 'yt-dlp');
+    const ytDlpBin = fs.existsSync(localYtDlp) ? localYtDlp : 'yt-dlp';
     const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
     execFile(
-        'yt-dlp',
+        ytDlpBin,
         [
             '-f',
             'best[ext=mp4][acodec!=none][vcodec!=none]/best[acodec!=none][vcodec!=none]',
