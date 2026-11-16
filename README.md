@@ -22,7 +22,7 @@ Dự án rạp chiếu phim 3D tương tác thời gian thực trên nền tản
   - Bấm **phím `E`** lần nữa để đứng dậy tiếp tục đi lại.
 - **Đổi góc nhìn linh hoạt (Phím `V`)**:
   - **Sau lưng (3rd Person)**: Bám theo sau nhân vật.
-  - **Tầm mắt (1st Person)**: Góc nhìn thứ nhất từ mắt nhân vật.
+  - **Tầm mắt (1st Person)**: Góc nhìn thứ nhất từ mắt nhân vật; avatar và bảng tên của bạn được ẩn để không che tầm nhìn.
   - **Toàn cảnh**: Quan sát tự do toàn bộ khán phòng.
 
 ### 3. Xem Phim Cùng Nhau (Multiplayer Realtime)

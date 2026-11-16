@@ -1073,12 +1073,9 @@ function selectSeatTarget(seatId) {
 function syncLocalAvatarVisibility() {
     if (!localAvatar) return;
 
-    const shouldHideForSeatView = !!currentSeatId && (cameraMode === '3rd_person' || cameraMode === '1st_person');
-
-    localAvatar.group.visible = !shouldHideForSeatView;
-    if (cameraMode === 'overview') {
-        localAvatar.group.visible = true;
-    }
+    const shouldHideAvatar = cameraMode === '1st_person'
+        || (!!currentSeatId && cameraMode === '3rd_person');
+    localAvatar.group.visible = !shouldHideAvatar || cameraMode === 'overview';
 
     if (localAvatar.group.visible) {
         const dist = camera.position.distanceTo(controls.target);
@@ -2125,7 +2122,7 @@ function updateNametags() {
     // Only render nametag for local player if they sent a speech bubble/emote (so their own nametag never blocks the cinema screen)
     const localBubble = document.getElementById(`bubble-${localPlayerId}`);
     const isLocalBubbleActive = localBubble && !localBubble.classList.contains('hidden');
-    if (localAvatar && localPlayerId && isLocalBubbleActive) {
+    if (localAvatar && localPlayerId && isLocalBubbleActive && cameraMode !== '1st_person') {
         updateOne(localPlayerId, localAvatar.group.position);
     } else {
         const localEl = document.getElementById(`nametag-${localPlayerId}`);
