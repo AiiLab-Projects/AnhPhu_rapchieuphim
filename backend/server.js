@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const path = require('path');
+const { execFile } = require('child_process');
 const WebSocket = require('ws');
 
 const app = express();
@@ -8,9 +9,51 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 8080;
+const youtubeStreamCache = new Map(); // videoId -> { url, expiresAt }
+const YOUTUBE_CACHE_TTL_MS = 30 * 60 * 1000;
 
 app.get('/health', (_req, res) => {
     res.status(200).json({ status: 'ok' });
+});
+
+app.get('/api/youtube-stream', (req, res) => {
+    const videoId = typeof req.query.id === 'string' ? req.query.id.trim() : '';
+    if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+        return res.status(400).json({ error: 'Invalid YouTube video ID' });
+    }
+
+    const cached = youtubeStreamCache.get(videoId);
+    if (cached && cached.expiresAt > Date.now()) {
+        return res.json({ url: cached.url, cached: true });
+    }
+
+    const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    execFile(
+        'yt-dlp',
+        [
+            '-f',
+            'best[ext=mp4][acodec!=none][vcodec!=none]/best[acodec!=none][vcodec!=none]',
+            '--get-url',
+            '--no-playlist',
+            watchUrl
+        ],
+        { timeout: 15000 },
+        (err, stdout, stderr) => {
+            if (err) {
+                console.error('yt-dlp error:', stderr || err.message);
+                return res.status(502).json({ error: 'Failed to extract YouTube stream' });
+            }
+            const streamUrl = stdout.trim().split(/\r?\n/)[0];
+            if (!streamUrl || !streamUrl.startsWith('http')) {
+                return res.status(502).json({ error: 'No playable stream URL found' });
+            }
+            youtubeStreamCache.set(videoId, {
+                url: streamUrl,
+                expiresAt: Date.now() + YOUTUBE_CACHE_TTL_MS
+            });
+            return res.json({ url: streamUrl, cached: false });
+        }
+    );
 });
 
 if (process.env.NODE_ENV !== 'production') {

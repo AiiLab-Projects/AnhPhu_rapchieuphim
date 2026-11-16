@@ -1634,12 +1634,26 @@ document.getElementById('file-upload').addEventListener('change', e => {
     if (lightMode === 2) applyLightMode(1);
 });
 
-function handleUrlSubmit() {
+async function handleUrlSubmit() {
     const rawUrl = document.getElementById('video-url-input').value.trim();
     if (!rawUrl) return;
 
     const ytId = extractYouTubeId(rawUrl);
     if (ytId) {
+        addChatMessage('system', 'Đang trích xuất luồng video YouTube không quảng cáo...');
+        try {
+            const res = await fetch(`/api/youtube-stream?id=${encodeURIComponent(ytId)}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.url) {
+                    loadDirectVideo(data.url, true);
+                    return;
+                }
+            }
+        } catch (err) {
+            console.warn('YouTube stream extraction failed, falling back to embed:', err);
+        }
+        addChatMessage('system', 'Không trích xuất được luồng trực tiếp, chuyển sang trình phát nhúng YouTube.');
         loadYouTubeVideo(ytId, true);
     } else {
         let videoUrl;
