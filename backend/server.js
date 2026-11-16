@@ -76,6 +76,8 @@ let cinemaVideoState = {
     lastUpdateTimestamp: Date.now()
 };
 let videoControllerId = null;
+let emptyRoomStopTimer = null;
+const EMPTY_ROOM_STOP_DELAY_MS = 10000; // 10 giây không có người sẽ dừng hẳn video
 
 function getCurrentVideoState() {
     const now = Date.now();
@@ -120,6 +122,11 @@ wss.on('close', () => {
 });
 
 wss.on('connection', ws => {
+    if (emptyRoomStopTimer) {
+        clearTimeout(emptyRoomStopTimer);
+        emptyRoomStopTimer = null;
+    }
+
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
 
@@ -309,6 +316,23 @@ wss.on('connection', ws => {
                 byPlayer: 'Hệ thống',
                 videoControllerId
             });
+        }
+        if (players.size === 0) {
+            if (emptyRoomStopTimer) clearTimeout(emptyRoomStopTimer);
+            emptyRoomStopTimer = setTimeout(() => {
+                if (players.size === 0) {
+                    cinemaVideoState = {
+                        mode: 'canvas',
+                        src: '',
+                        title: 'Intro IMAX 3D',
+                        currentTime: 0,
+                        isPlaying: false,
+                        lastUpdateTimestamp: Date.now()
+                    };
+                    videoControllerId = null;
+                    emptyRoomStopTimer = null;
+                }
+            }, EMPTY_ROOM_STOP_DELAY_MS);
         }
     });
 });
