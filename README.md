@@ -33,7 +33,8 @@ Dự án rạp chiếu phim 3D tương tác thời gian thực trên nền tản
 
 ### 4. Màn Hình Chiếu IMAX 24m × 10m Đa Phương Tiện
 - Phát video MP4/WebM từ URL công khai mà các thiết bị trong phòng đều truy cập được.
-- Hỗ trợ dán link video trực tuyến hoặc link **YouTube** phát thẳng trên màn hình 3D.
+- Video MP4/WebM được render trong WebGL nên ghế và nhân vật che màn hình đúng theo chiều sâu 3D.
+- Hỗ trợ phát link **YouTube** và đồng bộ điều khiển; do YouTube chạy trong iframe, ghế và nhân vật 3D có thể không che video đúng theo chiều sâu.
 - Tích hợp sẵn 4 phim mẫu độ phân giải cao cùng intro IMAX 3D Canvas động.
 - Video tải từ máy chỉ phát trên máy đã tải lên; muốn xem cùng nhau, hãy dùng link video công khai hoặc phim mẫu.
 
@@ -55,14 +56,46 @@ Dự án rạp chiếu phim 3D tương tác thời gian thực trên nền tản
 
 ## 🚀 Hướng Dẫn Cài Đặt & Khởi Chạy
 
-```bash
-# 1. Cài đặt các gói phụ thuộc
-npm install
+### Cấu trúc dự án
 
-# 2. Khởi chạy máy chủ
-node server.js
+- `frontend/`: giao diện tĩnh, có thể deploy riêng lên Netlify.
+- `backend/`: Express + WebSocket, quản lý phòng multiplayer và đồng bộ video.
+- `netlify.toml`: cấu hình thư mục frontend cho Netlify.
+- `render.yaml`: cấu hình deploy backend WebSocket trên Render.
+
+### Chạy trên máy cá nhân
+
+```bash
+# Cài dependency cho backend
+npm run install:backend
+
+# Chạy backend và frontend local
+npm start
 ```
 
-Sau khi chạy, mở trình duyệt và truy cập:
-- Máy chủ nội bộ: `http://localhost:8080`
-- Thiết bị khác cùng mạng Wi-Fi: `http://<IP_MÁY_BẠN>:8080`
+Mở `http://localhost:8080`. Thiết bị khác trong cùng mạng Wi-Fi có thể dùng `http://<IP_MÁY_BẠN>:8080`.
+
+### Deploy riêng frontend Netlify và backend Render
+
+1. Deploy repository lên Render bằng Blueprint (`render.yaml`). Backend dùng thư mục `backend/`; sau khi deploy, lấy URL HTTPS của dịch vụ, ví dụ `https://rapchieuphim-backend.onrender.com`.
+2. Trong `frontend/config.js`, đặt URL WebSocket backend:
+
+   ```js
+   window.CINEMA_WS_URL = 'wss://rapchieuphim-backend.onrender.com';
+   ```
+
+3. Deploy `frontend/` lên Netlify. `netlify.toml` đã đặt thư mục publish là `frontend/`; sau khi cập nhật `config.js`, deploy lại frontend.
+4. Chia sẻ URL Netlify cho người xem. Backend cần đang chạy và truy cập được; frontend HTTPS phải kết nối backend qua `wss://`.
+
+Netlify static hosting phù hợp cho frontend nhưng Netlify Functions không thay thế được WebSocket server chạy liên tục. Không cần chuyển sang Next.js để deploy giao diện; multiplayer vẫn cần backend WebSocket riêng như Render, Railway hoặc một VPS.
+
+### Deploy frontend GitHub Pages và backend Render
+
+Workflow `.github/workflows/deploy-frontend-pages.yml` tự deploy `frontend/` lên GitHub Pages khi push lên nhánh `main`.
+
+1. Deploy backend bằng `render.yaml` và lấy URL dịch vụ, ví dụ `https://rapchieuphim-backend.onrender.com`.
+2. Trong GitHub, vào **Settings → Secrets and variables → Actions → Variables**, tạo repository variable `CINEMA_WS_URL` với giá trị `wss://rapchieuphim-backend.onrender.com`.
+3. Vào **Settings → Pages**, chọn **GitHub Actions** làm nguồn deploy.
+4. Push workflow/code lên nhánh `main` hoặc chạy workflow thủ công trong tab **Actions**. Sau khi chạy thành công, GitHub sẽ cung cấp URL trang Pages trong phần **Settings → Pages**.
+
+Nếu chưa tạo biến `CINEMA_WS_URL`, giao diện vẫn deploy được nhưng multiplayer chưa kết nối backend. Frontend HTTPS cần dùng URL `wss://` của backend Render.

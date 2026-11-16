@@ -9,8 +9,13 @@ const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 8080;
 
-// Serve static frontend files
-app.use(express.static(path.join(__dirname)));
+app.get('/health', (_req, res) => {
+    res.status(200).json({ status: 'ok' });
+});
+
+if (process.env.NODE_ENV !== 'production') {
+    app.use(express.static(path.join(__dirname, '..', 'frontend')));
+}
 
 // ==========================================
 // MULTIPLAYER STATE
@@ -265,6 +270,6 @@ wss.on('connection', ws => {
     });
 });
 
-server.listen(PORT, () => {
-    console.log(`🎬 Rạp Chiếu Phim Multiplayer 3D đang chạy tại: http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🎬 WebSocket backend đang chạy tại cổng ${PORT}`);
 });

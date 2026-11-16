@@ -20,6 +20,7 @@ const SEAT_CAMERA_LOOK_DISTANCE = 20;
 const seatsData = new Map(); // id -> seat metadata & meshes
 const interactiveMeshes = []; // Meshes for raycasting
 let currentSeatId = null;
+let targetSeatId = null;
 let hoveredSeatId = null;
 let lightMode = 1; // 0: Tắt, 1: Mờ (Default), 2: Sáng
 let activeMediaMode = 'canvas'; // 'canvas' | 'video' | 'youtube'
@@ -818,7 +819,7 @@ function showSpeechBubble(id, text) {
 // ==========================================
 function initWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}`;
+    const wsUrl = window.CINEMA_WS_URL || `${protocol}//${window.location.host}`;
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -1044,6 +1045,30 @@ function broadcastLocalMovement() {
 // ==========================================
 const interactionHud = document.getElementById('interaction-hud');
 const interactionText = document.getElementById('interaction-text');
+const sitActionButton = document.getElementById('btn-sit-seat');
+
+function clearSeatTarget() {
+    targetSeatId = null;
+    if (sitActionButton) {
+        sitActionButton.classList.add('hidden');
+    }
+    if (!currentSeatId) {
+        interactionHud.classList.add('hidden');
+    }
+}
+
+function selectSeatTarget(seatId) {
+    const seat = seatsData.get(seatId);
+    if (!seat || currentSeatId) return;
+
+    targetSeatId = seatId;
+    interactionHud.classList.remove('hidden');
+    interactionText.textContent = `Đi tới ghế ${seatId}`;
+    if (sitActionButton) {
+        sitActionButton.classList.add('hidden');
+    }
+    updateSeatVisuals();
+}
 
 function syncLocalAvatarVisibility() {
     if (!localAvatar) return;
@@ -1117,6 +1142,7 @@ function sitDownLocalPlayer(seatId) {
     const seat = seatsData.get(seatId);
     if (!seat || !localAvatar) return;
 
+    targetSeatId = null;
     currentSeatId = seatId;
     localPlayerData.seatId = seatId;
     localPlayerData.state = 'sitting';
@@ -1144,6 +1170,9 @@ function sitDownLocalPlayer(seatId) {
     document.getElementById('current-seat-label').textContent = `Đang ngồi ghế ${seatId}`;
     interactionHud.classList.remove('hidden');
     interactionText.textContent = `Đứng dậy khỏi ghế ${seatId} (Phím E)`;
+    if (sitActionButton) {
+        sitActionButton.classList.add('hidden');
+    }
 
     lockSeatCamera(seat);
 }
@@ -1153,6 +1182,7 @@ function standUpLocalPlayer() {
 
     const seat = seatsData.get(currentSeatId);
     currentSeatId = null;
+    targetSeatId = null;
     localPlayerData.seatId = null;
     localPlayerData.state = 'standing';
 
@@ -1185,6 +1215,9 @@ function standUpLocalPlayer() {
     updateSeatVisuals();
     document.getElementById('current-seat-label').textContent = 'Đang đi lại';
     interactionHud.classList.add('hidden');
+    if (sitActionButton) {
+        sitActionButton.classList.add('hidden');
+    }
 }
 
 function updateSeatVisuals() {
@@ -1192,6 +1225,9 @@ function updateSeatVisuals() {
         if (id === currentSeatId) {
             seat.material.color.setHex(0x10b981);
             seat.material.emissive.setHex(0x065f46);
+        } else if (id === targetSeatId) {
+            seat.material.color.setHex(0xfbbf24);
+            seat.material.emissive.setHex(0x78350f);
         } else if (id === hoveredSeatId) {
             seat.material.color.setHex(0x60a5fa);
             seat.material.emissive.setHex(0x1e3a8a);
@@ -1203,6 +1239,7 @@ function updateSeatVisuals() {
 
     document.querySelectorAll('.seat-cell').forEach(btn => {
         btn.classList.toggle('current', btn.dataset.seat === currentSeatId);
+        btn.classList.toggle('selected', btn.dataset.seat === targetSeatId);
     });
 }
 
@@ -1283,7 +1320,7 @@ renderer.domElement.addEventListener('pointerup', e => {
     if (hits.length > 0) {
         const seatId = hits[0].object.userData.seatId;
         if (seatId) {
-            sitDownLocalPlayer(seatId);
+            selectSeatTarget(seatId);
         }
     }
 });
@@ -1858,8 +1895,16 @@ function initUI() {
 
     document.getElementById('btn-go-seat').addEventListener('click', () => {
         const seatId = `${selectRow.value}${selectCol.value}`;
-        sitDownLocalPlayer(seatId);
+        selectSeatTarget(seatId);
     });
+
+    if (sitActionButton) {
+        sitActionButton.addEventListener('click', () => {
+            if (!currentSeatId && targetSeatId) {
+                sitDownLocalPlayer(targetSeatId);
+            }
+        });
+    }
 
     // Camera Mode toggle (3rd person / 1st person / Overview)
     const btnCameraMode = document.getElementById('btn-camera-mode');
@@ -1892,8 +1937,9 @@ function initUI() {
     document.querySelectorAll('.preset-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             if (btn.dataset.seat) {
-                sitDownLocalPlayer(btn.dataset.seat);
+                selectSeatTarget(btn.dataset.seat);
             } else if (btn.dataset.preset === 'aisle_center') {
+                targetSeatId = null;
                 if (currentSeatId) standUpLocalPlayer();
                 localPlayerData.x = 0;
                 localPlayerData.z = 8;
@@ -1901,6 +1947,7 @@ function initUI() {
                 localAvatar.group.position.set(0, localPlayerData.y, 8);
                 broadcastLocalMovement();
             } else if (btn.dataset.preset === 'stage') {
+                targetSeatId = null;
                 if (currentSeatId) standUpLocalPlayer();
                 localPlayerData.x = 0;
                 localPlayerData.z = -14;
@@ -1991,7 +2038,7 @@ function initUI() {
             cell.title = `Ghế ${seatId} - ${cat.name}`;
             cell.addEventListener('click', () => {
                 seatmapModal.classList.add('hidden');
-                sitDownLocalPlayer(seatId);
+                selectSeatTarget(seatId);
             });
             rowEl.appendChild(cell);
         }
@@ -2025,9 +2072,12 @@ function initUI() {
             if (currentSeatId) {
                 standUpLocalPlayer();
             } else {
-                const near = findNearestSeat();
-                if (near) {
-                    sitDownLocalPlayer(near.id);
+                const targetSeat = targetSeatId ? seatsData.get(targetSeatId) : null;
+                if (targetSeat) {
+                    const dist = localAvatar.group.position.distanceTo(targetSeat.sitPosition);
+                    if (dist < 1.4) {
+                        sitDownLocalPlayer(targetSeat.id);
+                    }
                 }
             }
         } else if (e.code === 'KeyV') {
@@ -2154,66 +2204,112 @@ function animate(now) {
     }
 
     if (localAvatar && !currentSeatId) {
-        const moveVec = new THREE.Vector3();
+        const selectedSeat = targetSeatId ? seatsData.get(targetSeatId) : null;
+        const hasManualInput = keys['KeyW'] || keys['ArrowUp'] || keys['KeyS'] || keys['ArrowDown'] || keys['KeyD'] || keys['ArrowRight'] || keys['KeyA'] || keys['ArrowLeft'];
 
-        // Get camera forward direction projected onto horizontal plane
-        const camDir = new THREE.Vector3();
-        camera.getWorldDirection(camDir);
-        camDir.y = 0;
-        camDir.normalize();
+        if (selectedSeat && !hasManualInput) {
+            const toSeat = new THREE.Vector3().subVectors(selectedSeat.sitPosition, localAvatar.group.position);
+            const seatDistance = toSeat.length();
 
-        const camRight = new THREE.Vector3().crossVectors(camDir, camera.up).normalize();
+            if (seatDistance > 0.65) {
+                const direction = toSeat.normalize();
+                const speed = 4.8 * delta;
+                localPlayerData.x += direction.x * speed;
+                localPlayerData.z += direction.z * speed;
 
-        if (keys['KeyW'] || keys['ArrowUp']) moveVec.add(camDir);
-        if (keys['KeyS'] || keys['ArrowDown']) moveVec.sub(camDir);
-        if (keys['KeyD'] || keys['ArrowRight']) moveVec.add(camRight);
-        if (keys['KeyA'] || keys['ArrowLeft']) moveVec.sub(camRight);
+                localPlayerData.x = Math.max(-19.5, Math.min(19.5, localPlayerData.x));
+                localPlayerData.z = Math.max(-18.0, Math.min(27.5, localPlayerData.z));
 
-        if (moveVec.lengthSq() > 0.001) {
-            isMoving = true;
-            moveVec.normalize();
+                const targetY = getFloorElevationAt(localPlayerData.x, localPlayerData.z);
+                localPlayerData.y += (targetY - localPlayerData.y) * 0.22;
 
-            const speed = 5.6 * delta;
-            localPlayerData.x += moveVec.x * speed;
-            localPlayerData.z += moveVec.z * speed;
-
-            // Boundaries
-            localPlayerData.x = Math.max(-19.5, Math.min(19.5, localPlayerData.x));
-            localPlayerData.z = Math.max(-18.0, Math.min(27.5, localPlayerData.z));
-
-            // Calculate floor height based on stadium risers
-            const targetY = getFloorElevationAt(localPlayerData.x, localPlayerData.z);
-            localPlayerData.y += (targetY - localPlayerData.y) * 0.22;
-
-            // Rotate avatar smoothly to face movement direction
-            const targetYaw = Math.atan2(moveVec.x, moveVec.z);
-            let diff = targetYaw - localPlayerData.yaw;
-            while (diff < -Math.PI) diff += Math.PI * 2;
-            while (diff > Math.PI) diff -= Math.PI * 2;
-            localPlayerData.yaw += diff * 0.25;
-
-            localAvatar.group.position.set(localPlayerData.x, localPlayerData.y, localPlayerData.z);
-            localAvatar.group.rotation.y = localPlayerData.yaw;
-
-            localPlayerData.state = 'walking';
-            broadcastLocalMovement();
-
-            // Check if near any seat
-            const nearSeat = findNearestSeat();
-            if (nearSeat) {
-                interactionHud.classList.remove('hidden');
-                interactionText.textContent = `Ngồi vào ghế ${nearSeat.id}`;
-            } else {
-                interactionHud.classList.add('hidden');
-            }
-        } else {
-            if (localPlayerData.state === 'walking') {
-                localPlayerData.state = 'standing';
+                localPlayerData.yaw = Math.atan2(direction.x, direction.z);
+                localAvatar.group.position.set(localPlayerData.x, localPlayerData.y, localPlayerData.z);
+                localAvatar.group.rotation.y = localPlayerData.yaw;
+                localPlayerData.state = 'walking';
                 broadcastLocalMovement();
-            }
-        }
 
-        localAvatar.animateWalk(isMoving, delta);
+                interactionHud.classList.remove('hidden');
+                interactionText.textContent = `Đi tới ghế ${selectedSeat.id}`;
+                if (sitActionButton) sitActionButton.classList.add('hidden');
+                isMoving = true;
+            } else {
+                interactionHud.classList.remove('hidden');
+                interactionText.textContent = `Sẵn sàng ngồi ghế ${selectedSeat.id}`;
+                if (sitActionButton) {
+                    sitActionButton.textContent = `Ngồi ${selectedSeat.id}`;
+                    sitActionButton.classList.remove('hidden');
+                }
+                if (localPlayerData.state === 'walking') {
+                    localPlayerData.state = 'standing';
+                    broadcastLocalMovement();
+                }
+                localAvatar.animateWalk(false, delta);
+            }
+            localAvatar.animateWalk(isMoving, delta);
+        } else {
+            const moveVec = new THREE.Vector3();
+
+            // Get camera forward direction projected onto horizontal plane
+            const camDir = new THREE.Vector3();
+            camera.getWorldDirection(camDir);
+            camDir.y = 0;
+            camDir.normalize();
+
+            const camRight = new THREE.Vector3().crossVectors(camDir, camera.up).normalize();
+
+            if (keys['KeyW'] || keys['ArrowUp']) moveVec.add(camDir);
+            if (keys['KeyS'] || keys['ArrowDown']) moveVec.sub(camDir);
+            if (keys['KeyD'] || keys['ArrowRight']) moveVec.add(camRight);
+            if (keys['KeyA'] || keys['ArrowLeft']) moveVec.sub(camRight);
+
+            if (moveVec.lengthSq() > 0.001) {
+                if (targetSeatId) {
+                    targetSeatId = null;
+                    if (sitActionButton) sitActionButton.classList.add('hidden');
+                }
+                isMoving = true;
+                moveVec.normalize();
+
+                const speed = 5.6 * delta;
+                localPlayerData.x += moveVec.x * speed;
+                localPlayerData.z += moveVec.z * speed;
+
+                // Boundaries
+                localPlayerData.x = Math.max(-19.5, Math.min(19.5, localPlayerData.x));
+                localPlayerData.z = Math.max(-18.0, Math.min(27.5, localPlayerData.z));
+
+                // Calculate floor height based on stadium risers
+                const targetY = getFloorElevationAt(localPlayerData.x, localPlayerData.z);
+                localPlayerData.y += (targetY - localPlayerData.y) * 0.22;
+
+                // Rotate avatar smoothly to face movement direction
+                const targetYaw = Math.atan2(moveVec.x, moveVec.z);
+                let diff = targetYaw - localPlayerData.yaw;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                localPlayerData.yaw += diff * 0.25;
+
+                localAvatar.group.position.set(localPlayerData.x, localPlayerData.y, localPlayerData.z);
+                localAvatar.group.rotation.y = localPlayerData.yaw;
+
+                localPlayerData.state = 'walking';
+                broadcastLocalMovement();
+
+                interactionHud.classList.add('hidden');
+            } else {
+                if (localPlayerData.state === 'walking') {
+                    localPlayerData.state = 'standing';
+                    broadcastLocalMovement();
+                }
+                if (!targetSeatId) {
+                    interactionHud.classList.add('hidden');
+                    if (sitActionButton) sitActionButton.classList.add('hidden');
+                }
+            }
+
+            localAvatar.animateWalk(isMoving, delta);
+        }
 
         // Update Camera Position based on mode (Tịnh tiến theo nhân vật mượt mà, KHÔNG bị vòng lặp tự xoay)
         if (cameraMode === '3rd_person') {

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Rạp Chiếu Phim 3D IMAX - Multiplayer 500 Chỗ Ngồi</title>
     <link rel="stylesheet" href="style.css" />
+    <script src="config.js"></script>
     <script type="importmap">
         {
             "imports": {
@@ -31,6 +32,7 @@
     <div id="interaction-hud" class="interaction-hud hidden">
         <span class="key-badge">E</span>
         <span id="interaction-text">Ngồi vào ghế I13</span>
+        <button id="btn-sit-seat" class="btn btn-primary interaction-btn hidden" type="button">Ngồi</button>
     </div>
 
     <!-- Top Header Bar -->
@@ -204,7 +206,7 @@
             </div>
         </div>
         <div id="youtube-notice" class="youtube-notice hidden">
-            Video YouTube được đồng bộ phát, tạm dừng và tua cho cả phòng bằng thanh điều khiển bên trên.
+            YouTube phát bằng iframe; ghế và nhân vật 3D có thể không che video đúng theo chiều sâu.
         </div>
     </footer>
 

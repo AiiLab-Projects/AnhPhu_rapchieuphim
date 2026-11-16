@@ -497,6 +497,13 @@ body, html {
     animation: bounce 1.6s infinite ease-in-out;
 }
 
+.interaction-btn {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    min-height: 28px;
+}
+
 .key-badge {
     background: #ef4444;
     color: #fff;
@@ -837,6 +844,11 @@ body, html {
 .seat-cell.standard { background: var(--seat-standard); }
 .seat-cell.vip { background: var(--seat-vip); color: #111; }
 .seat-cell.couple { background: var(--seat-couple); }
+.seat-cell.selected {
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.85);
+    outline: 2px solid #fbbf24;
+    filter: brightness(1.18);
+}
 .seat-cell.current {
     background: var(--seat-current) !important;
     color: #fff !important;
