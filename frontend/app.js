@@ -969,7 +969,7 @@ function handleNetworkMessage(msg) {
 
         case 'video_synced': {
             videoControllerId = msg.videoControllerId || null;
-            applySyncedVideo(msg.videoState);
+            applySyncedVideo(msg.videoState, msg.action);
             if (msg.action !== 'tick') {
                 addChatMessage('system', `${msg.byPlayer} vừa chuyển hoặc điều khiển phim.`);
             }
@@ -1425,7 +1425,7 @@ function applyYouTubeState(state, currentTime, action) {
     };
 
     if (isNewVideo && !youtubePlayer) {
-        youtubeIframe.src = `https://www.youtube.com/embed/${encodeURIComponent(state.src)}?enablejsapi=1&controls=0&autoplay=1&rel=0&modestbranding=1&origin=${encodeURIComponent(window.location.origin)}`;
+        youtubeIframe.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(state.src)}?enablejsapi=1&controls=0&autoplay=1&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1&origin=${encodeURIComponent(window.location.origin)}`;
     }
     ensureYouTubePlayer();
     if (youtubePlayer && youtubePlayerReady) {
@@ -1497,8 +1497,12 @@ function applyPendingYouTubeState() {
         if (Math.abs(currentTime - state.currentTime) > 1.25) {
             youtubePlayer.seekTo(state.currentTime, true);
         }
-        if (state.isPlaying) youtubePlayer.playVideo();
-        else youtubePlayer.pauseVideo();
+        const playerState = youtubePlayer.getPlayerState?.();
+        if (state.isPlaying && playerState !== window.YT?.PlayerState.PLAYING) {
+            youtubePlayer.playVideo();
+        } else if (!state.isPlaying && playerState === window.YT?.PlayerState.PLAYING) {
+            youtubePlayer.pauseVideo();
+        }
     }
     btnPlayPause.textContent = state.isPlaying ? 'Tạm dừng' : 'Phát phim';
 }
@@ -1575,7 +1579,7 @@ function loadYouTubeVideo(videoId, sync = true, startTime = 0, isPlaying = true)
     youtubeVideoId = videoId;
     pendingYouTubeState = { videoId, currentTime: startTime, isPlaying, load: true };
     if (!youtubePlayer) {
-        youtubeIframe.src = `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?enablejsapi=1&controls=0&autoplay=1&rel=0&modestbranding=1&origin=${encodeURIComponent(window.location.origin)}`;
+        youtubeIframe.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?enablejsapi=1&controls=0&autoplay=1&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1&origin=${encodeURIComponent(window.location.origin)}`;
     }
     youtubeCssObject.visible = true;
     css3dContainer.classList.add('youtube-active');
